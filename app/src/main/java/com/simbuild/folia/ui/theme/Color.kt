@@ -20,6 +20,17 @@ val SepiaReadingBg = Color(0xFFFBF0D9)
 val SepiaReadingSurface = Color(0xFFF3E5C8)
 val SepiaReadingText = Color(0xFF3E2D1D)
 
+// Folio Figma Design System Palette
+val FolioForestGreen = Color(0xFF223624)
+val FolioSageCard = Color(0xFFE8EFE6)
+val FolioSageCardDark = Color(0xFF243024)
+val FolioPillBg = Color(0xFFF1F4F0)
+val FolioPillBgDark = Color(0xFF2C2C2C)
+val FolioSubtleText = Color(0xFF758276)
+val FolioSubtleTextDark = Color(0xFFA0AFA1)
+val FolioAddBtnBg = Color(0xFFE2EBE1)
+val FolioAddBtnBgDark = Color(0xFF2E3D30)
+
 // Format Badges
 val FormatPdf = Color(0xFFE53935)
 val FormatEpub = Color(0xFF2E7D32)
