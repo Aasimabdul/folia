@@ -469,7 +469,8 @@ fun ReaderScreen(
             )
         }
     }
-    
+    }
+
     @Composable
     private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int) {
         val density = LocalDensity.current
