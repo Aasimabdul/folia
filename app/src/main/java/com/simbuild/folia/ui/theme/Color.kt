@@ -1,0 +1,38 @@
+package com.simbuild.folia.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val FoliaPrimary = Color(0xFF2E7D32)
+val FoliaPrimaryLight = Color(0xFF4CAF50)
+val FoliaPrimaryDark = Color(0xFF1B5E20)
+val FoliaSecondary = Color(0xFF455A64)
+
+// Reading Mode Themes
+val DarkReadingBg = Color(0xFF121212)
+val DarkReadingSurface = Color(0xFF1E1E1E)
+val DarkReadingText = Color(0xFFE0E0E0)
+
+val LightReadingBg = Color(0xFFF9F9FB)
+val LightReadingSurface = Color(0xFFFFFFFF)
+val LightReadingText = Color(0xFF1C1B1F)
+
+val SepiaReadingBg = Color(0xFFFBF0D9)
+val SepiaReadingSurface = Color(0xFFF3E5C8)
+val SepiaReadingText = Color(0xFF3E2D1D)
+
+// Format Badges
+val FormatPdf = Color(0xFFE53935)
+val FormatEpub = Color(0xFF2E7D32)
+val FormatOffice = Color(0xFF1E88E5)
+val FormatComic = Color(0xFFFB8C00)
+val FormatText = Color(0xFF8E24AA)
+val FormatDefault = Color(0xFF546E7A)
+
+fun getFormatBadgeColor(format: String): Color = when (format.uppercase()) {
+    "PDF" -> FormatPdf
+    "EPUB", "MOBI", "FB2" -> FormatEpub
+    "DOCX", "XLSX", "PPTX", "DOC", "XLS", "PPT" -> FormatOffice
+    "CBZ", "CBR" -> FormatComic
+    "TXT", "MARKDOWN", "MD", "CSV", "HTML" -> FormatText
+    else -> FormatDefault
+}
