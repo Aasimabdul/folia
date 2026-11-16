@@ -44,7 +44,7 @@ object DocEngines {
         } ?: error("Cannot open document stream")
 
         val targetFile = when (ext) {
-            "md", "markdown", "csv" -> {
+            "md", "markdown", "csv", "docx", "doc", "rtf", "odt" -> {
                 val htmlFile = File(dir, "doc.html")
                 FormatConverter.convertToHtmlFile(rawFile, ext, htmlFile)
                 htmlFile
@@ -68,7 +68,10 @@ object DocEngines {
         "epub" -> "EPUB"
         "mobi" -> "MOBI"
         "fb2" -> "FB2"
-        "docx", "doc" -> "DOCX"
+        "docx" -> "DOCX"
+        "doc" -> "DOC"
+        "rtf" -> "RTF"
+        "odt" -> "ODT"
         "xlsx", "xls" -> "XLSX"
         "pptx", "ppt" -> "PPTX"
         "cbz" -> "CBZ"

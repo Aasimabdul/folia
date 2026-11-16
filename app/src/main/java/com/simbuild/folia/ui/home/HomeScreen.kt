@@ -92,7 +92,7 @@ fun HomeScreen(
                 "All" -> true
                 "PDF" -> doc.format.equals("PDF", ignoreCase = true)
                 "eBooks" -> doc.format in listOf("EPUB", "MOBI", "FB2")
-                "Office" -> doc.format in listOf("DOCX", "XLSX", "PPTX", "DOC", "XLS", "PPT")
+                "Office" -> doc.format in listOf("DOCX", "XLSX", "PPTX", "DOC", "XLS", "PPT", "RTF", "ODT")
                 "Comics" -> doc.format in listOf("CBZ", "CBR")
                 "Text & Code" -> doc.format in listOf("TXT", "MARKDOWN", "MD", "CSV", "HTML")
                 else -> true
