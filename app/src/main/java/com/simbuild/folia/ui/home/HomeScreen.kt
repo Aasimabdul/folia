@@ -148,8 +148,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .statusBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
+            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // 1. Header: FOLIO tag, title & add button
             item {
@@ -168,7 +168,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "A little space to read.",
+                            text = "A quieter way to read.",
                             fontFamily = FontFamily.Serif,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -176,7 +176,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "Your next good idea starts here.",
+                            text = "Everything you read, in one calm space.",
                             fontSize = 13.sp,
                             color = subtleColor
                         )
@@ -381,7 +381,7 @@ private fun ContinueReadingHeroCard(
     val percent = ((current.toFloat() / total) * 100).toInt()
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg),
         modifier = Modifier
             .fillMaxWidth()
@@ -663,7 +663,7 @@ private fun FolioBottomNavBar(
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        tonalElevation = 0.dp
     ) {
         val items = listOf(
             Triple(0, "Home", Icons.Default.Home),
@@ -697,7 +697,7 @@ private fun SettingsInfoDialog(onDismiss: () -> Unit) {
         title = { Text("Folia Settings & Info", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Version: 0.1.0 (Open Source)", fontWeight = FontWeight.SemiBold)
+                Text("Version: 0.3.0 (Open Source)", fontWeight = FontWeight.SemiBold)
                 Text("Theme: Auto / Dark (#1E1E1E) / Warm Sepia / Light")
                 Text("Privacy: 100% Offline • Zero Analytics • No Network Permissions")
                 Text("Engine: MuPDF Fitz Core + Modular OpenXML & Stream Parsers")
