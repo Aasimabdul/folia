@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,14 +29,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -70,6 +72,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.simbuild.folia.engine.DocEngine
 import com.simbuild.folia.engine.PageCache
+import com.simbuild.folia.engine.SearchResult
+import com.simbuild.folia.engine.TocItem
 import com.simbuild.folia.ui.theme.DarkReadingBg
 import com.simbuild.folia.ui.theme.LightReadingBg
 import com.simbuild.folia.ui.theme.ReadingThemeMode
@@ -81,14 +85,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Full-featured Reader Screen for Folia:
+ * Universal Reader Screen:
  * - Immersive reading with auto-hide toolbars on tap
  * - Smooth vertical scrolling with byte-budgeted LRU cache
- * - Interactive page scrubber / jump-to-page slider
+ * - Find-in-document search with match navigation
+ * - Table of Contents (TOC / Outlines) chapter navigation
  * - Reading themes (AMOLED Dark, Light Paper, Warm Sepia)
- * - Reflow text scaling (A- / A+) for EPUB/MOBI/TXT/Office
+ * - Reflow text scaling (A- / A+) for EPUB/Word/Markdown/Code/Office
  * - Double-tap / gesture zoom & pan
- * - Document metadata / info dialog
+ * - Detailed format capability and security audit dialog
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +109,13 @@ fun ReaderScreen(
     var readingTheme by remember { mutableStateOf(ReadingThemeMode.DARK) }
     var fontSizePt by remember { mutableFloatStateOf(14f) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showTocDialog by remember { mutableStateOf(false) }
+
+    // Search state
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
+    var currentMatchIndex by remember { mutableIntStateOf(0) }
 
     val bgColor = when (readingTheme) {
         ReadingThemeMode.DARK -> DarkReadingBg
@@ -124,7 +136,7 @@ fun ReaderScreen(
         var pageCount by remember(engine) { mutableIntStateOf(engine.pageCount) }
         var layoutVersion by remember(engine) { mutableIntStateOf(0) }
 
-        // Relayout reflowable formats (EPUB/MOBI/TXT/Office/MD)
+        // Relayout reflowable formats
         LaunchedEffect(engine, widthPx, heightPx, fontSizePt) {
             if (engine.isReflowable) {
                 withContext(Dispatchers.Default) {
@@ -153,6 +165,22 @@ fun ReaderScreen(
                 .collect { page ->
                     onPageChanged(page, pageCount)
                 }
+        }
+
+        // Search execution
+        LaunchedEffect(searchQuery) {
+            if (searchQuery.length >= 2) {
+                withContext(Dispatchers.Default) {
+                    val results = engine.search(searchQuery)
+                    searchResults = results
+                    currentMatchIndex = 0
+                    if (results.isNotEmpty()) {
+                        listState.animateScrollToItem(results[0].page)
+                    }
+                }
+            } else {
+                searchResults = emptyList()
+            }
         }
 
         // Zoom & Pan state
@@ -205,81 +233,150 @@ fun ReaderScreen(
             exit = slideOutVertically(targetOffsetY = { -it }),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(getFormatBadgeColor(engine.format))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = engine.format.uppercase(),
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+            Column {
+                TopAppBar(
+                    title = {
+                        if (isSearchActive) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    placeholder = { Text("Find in document...", fontSize = 14.sp) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (searchResults.isNotEmpty()) {
+                                    Text(
+                                        text = "${currentMatchIndex + 1}/${searchResults.size}",
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            if (currentMatchIndex > 0) {
+                                                currentMatchIndex--
+                                                coroutineScope.launch {
+                                                    listState.animateScrollToItem(searchResults[currentMatchIndex].page)
+                                                }
+                                            }
+                                        },
+                                        enabled = currentMatchIndex > 0
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Prev Match")
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (currentMatchIndex < searchResults.size - 1) {
+                                                currentMatchIndex++
+                                                coroutineScope.launch {
+                                                    listState.animateScrollToItem(searchResults[currentMatchIndex].page)
+                                                }
+                                            }
+                                        },
+                                        enabled = currentMatchIndex < searchResults.size - 1
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Match")
+                                    }
+                                }
+                                IconButton(onClick = {
+                                    isSearchActive = false
+                                    searchQuery = ""
+                                    searchResults = emptyList()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close search")
+                                }
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(getFormatBadgeColor(engine.format))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = engine.format.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = engine.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = engine.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                actions = {
-                    // Reflow font size buttons
-                    if (engine.isReflowable) {
-                        IconButton(onClick = { fontSizePt = (fontSizePt - 2f).coerceAtLeast(10f) }) {
-                            Text("A-", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                        IconButton(onClick = { fontSizePt = (fontSizePt + 2f).coerceAtMost(28f) }) {
-                            Text("A+", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-                    }
+                    },
+                    actions = {
+                        if (!isSearchActive) {
+                            // Find in document button
+                            IconButton(onClick = { isSearchActive = true }) {
+                                Icon(Icons.Default.Search, contentDescription = "Find in document")
+                            }
 
-                    // Theme toggle button
-                    IconButton(onClick = {
-                        readingTheme = when (readingTheme) {
-                            ReadingThemeMode.DARK -> ReadingThemeMode.SEPIA
-                            ReadingThemeMode.SEPIA -> ReadingThemeMode.LIGHT
-                            ReadingThemeMode.LIGHT -> ReadingThemeMode.DARK
-                        }
-                    }) {
-                        val iconColor = when (readingTheme) {
-                            ReadingThemeMode.DARK -> Color(0xFF90CAF9)
-                            ReadingThemeMode.SEPIA -> Color(0xFFD7CCC8)
-                            ReadingThemeMode.LIGHT -> Color(0xFFFFB74D)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(iconColor)
-                        )
-                    }
+                            // Table of contents button
+                            IconButton(onClick = { showTocDialog = true }) {
+                                Text("📑", fontSize = 16.sp)
+                            }
 
-                    // Document details dialog
-                    IconButton(onClick = { showInfoDialog = true }) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = "Document Info")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                            // Reflow font size buttons
+                            if (engine.isReflowable) {
+                                IconButton(onClick = { fontSizePt = (fontSizePt - 2f).coerceAtLeast(10f) }) {
+                                    Text("A-", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
+                                IconButton(onClick = { fontSizePt = (fontSizePt + 2f).coerceAtMost(28f) }) {
+                                    Text("A+", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                }
+                            }
+
+                            // Theme toggle button
+                            IconButton(onClick = {
+                                readingTheme = when (readingTheme) {
+                                    ReadingThemeMode.DARK -> ReadingThemeMode.SEPIA
+                                    ReadingThemeMode.SEPIA -> ReadingThemeMode.LIGHT
+                                    ReadingThemeMode.LIGHT -> ReadingThemeMode.DARK
+                                }
+                            }) {
+                                val iconColor = when (readingTheme) {
+                                    ReadingThemeMode.DARK -> Color(0xFF90CAF9)
+                                    ReadingThemeMode.SEPIA -> Color(0xFFD7CCC8)
+                                    ReadingThemeMode.LIGHT -> Color(0xFFFFB74D)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(iconColor)
+                                )
+                            }
+
+                            // Document details dialog
+                            IconButton(onClick = { showInfoDialog = true }) {
+                                Icon(imageVector = Icons.Default.Info, contentDescription = "Document Info")
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    )
                 )
-            )
+            }
         }
 
         // Bottom Page Control Scrubber Bar
@@ -355,8 +452,22 @@ fun ReaderScreen(
     if (showInfoDialog) {
         DocumentInfoDialog(
             engine = engine,
-            currentPage = listState.firstVisibleItemIndex + 1,
+            currentPage = currentPage + 1,
             onDismiss = { showInfoDialog = false }
+        )
+    }
+
+    if (showTocDialog) {
+        val toc = remember(engine) { engine.tableOfContents() }
+        TocDialog(
+            tocItems = toc,
+            onSelectPage = { page ->
+                coroutineScope.launch {
+                    listState.animateScrollToItem(page.coerceIn(0, (engine.pageCount - 1).coerceAtLeast(0)))
+                }
+                showTocDialog = false
+            },
+            onDismiss = { showTocDialog = false }
         )
     }
 }
@@ -397,6 +508,52 @@ private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: I
 }
 
 @Composable
+private fun TocDialog(
+    tocItems: List<TocItem>,
+    onSelectPage: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Table of Contents", fontWeight = FontWeight.Bold) },
+        text = {
+            if (tocItems.isEmpty()) {
+                Text("No table of contents outline available for this document.")
+            } else {
+                LazyColumn(modifier = Modifier.height(320.dp)) {
+                    items(tocItems) { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectPage(item.page) }
+                                .padding(vertical = 10.dp, horizontal = (item.level * 16).dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = item.title,
+                                modifier = Modifier.weight(1f),
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "p. ${item.page + 1}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
 private fun DocumentInfoDialog(
     engine: DocEngine,
     currentPage: Int,
@@ -418,18 +575,18 @@ private fun DocumentInfoDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 InfoItem("Title", engine.title)
                 InfoItem("Format", engine.format)
+                InfoItem("Capability", engine.supportStatus.label)
                 InfoItem("Total Pages", "${engine.pageCount}")
                 InfoItem("Current Page", "$currentPage")
                 if (engine.fileSize > 0) {
                     InfoItem("File Size", sizeText)
                 }
                 InfoItem("Layout Mode", if (engine.isReflowable) "Reflowable (Adjustable text)" else "Fixed Page")
+                InfoItem("Security", "100% Offline • Sandboxed")
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Done")
-            }
+            TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
 }

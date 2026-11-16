@@ -1,55 +1,56 @@
-# Folia 🌿
+# Folia 🌿 — Universal Document Reader for Android
 
-A modern, fast, and privacy-first document and eBook reader for Android.  
-**Zero ads. Zero tracking. Zero internet permissions required.**
+A modern, fast, offline, and privacy-first **Universal Document Reading Platform** for Android.  
+**Zero ads. Zero tracking. Zero network permissions required.**
 
 ---
 
 ## 📖 Overview
 
-**Folia** (Latin for *leaves / pages*) is built to open virtually any document format smoothly on mobile devices without relying on heavy cloud converters or battery-draining office suites.
+**Folia** is engineered to open, parse, render, search, and read the widest practical range of document and file formats in a single unified application. It eliminates the need for separate reader apps, cloud converters, or heavy office suites that compromise privacy and battery life.
 
-By leveraging a single native C core ([MuPDF](https://mupdf.com)) combined with Jetpack Compose (Material 3), Folia provides snappy reading, reflowable eBook formatting, and low RAM consumption even on 4 GB entry-level Android devices.
+Built with **Kotlin**, **Jetpack Compose (Material 3)**, and **MuPDF (Fitz JNI core)**, Folia maintains an ultra-low memory footprint and runs smoothly on entry-level Android devices with 4 GB of RAM.
 
 ---
 
-## 📂 Supported Formats
+## 📂 Format Capabilities at a Glance
 
-| Category | Formats | Engine / Technique |
+Folia adheres to strict capability reporting: every format has an explicit status (**Native Rendering**, **Library Rendering**, **Converted Preview**, **Text Extraction**, **Image Preview**, **Partial Support**, or **Unsupported**).
+
+| Category | Formats Covered | How It Works |
 |---|---|---|
-| **Documents & Print** | PDF, XPS, OpenXPS | MuPDF native engine |
-| **eBooks & Literature** | EPUB, MOBI, FB2, AZW | MuPDF native reflow engine |
-| **Office & Productivity** | DOCX, XLSX, PPTX | MuPDF text & structure reflow |
-| **Comics & Manga** | CBZ, CBR | Archive stream renderer |
-| **Notes & Formats** | Markdown (`.md`), Plain Text (`.txt`), HTML | Styled HTML typography wrapper |
-| **Data & Code** | CSV, JSON, XML, Code (`.kt`, `.py`, `.java`, `.cpp`, `.js`) | Monospace & tabular reflow |
+| **A. Word Processing** | `.docx`, `.doc`, `.docm`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`, `.tex`, `.wpd` | Parsed offline to responsive styled HTML with typography and font scaling |
+| **B. PDF & Fixed Layout** | `.pdf`, `.xps`, `.oxps`, `.djvu`, `.chm` | High-fidelity MuPDF vector core; TOC outline navigation and in-document search |
+| **C. eBooks & Comics** | `.epub`, `.mobi`, `.azw`, `.azw3`, `.fb2`, `.cbz`, `.cbr` | Reflowable eBook reading with dark/sepia themes; streaming comic page viewer |
+| **D. Spreadsheets** | `.xlsx`, `.xls`, `.xlsm`, `.ods`, `.csv`, `.tsv` | Multi-worksheet tabs, shared strings pool, responsive HTML tables with zebra striping |
+| **E. Presentations** | `.pptx`, `.ppt`, `.ppsx`, `.odp` | Visual slide deck cards with slide numbers, titles, tables, and embedded images |
+| **F. Code & Markup** | `.html`, `.xml`, `.json`, `.yaml`, `.py`, `.java`, `.kt`, `.c`, `.cpp`, `.js`, `.ts`, `.sql`, `.sh`, `.log` | Monospace code viewer with syntax line numbers and keyword styling; safe HTML |
+| **G. Images & Scanned** | `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, `.gif`, `.tiff`, `.svg`, `.ico`, `.heic` | Memory-safe downsampled bitmap preview; sanitized SVG vector graphics |
+| **H. Archives** | `.zip`, `.tar`, `.gz`, `.7z`, `.rar` | Safe archive browser; Zip-slip and Zip-bomb protected; tap files to open |
+| **I. Technical & Notes** | `.eml`, `.msg`, `.ics`, `.vcf`, `.odg`, `.dxf`, `.pub`, `.vsd`, `.one` | Email, calendar, and vCard summaries; honest compatibility disclosure for CAD/DTP |
+
+> 📌 **Complete Matrix:** See [`FORMATS.md`](file:///home/abdulaasim/Downloads/docreader/FORMATS.md) for the exhaustive table of all 100+ extensions, MIME types, and technical notes.
 
 ---
 
 ## ✨ Features
 
-- **🛡️ 100% Private & Offline**: No `android.permission.INTERNET` in `AndroidManifest.xml`. Your documents never leave your phone.
-- **📚 Home Library & Recents**:
-  - Automatically records recently opened files, reading progress (Page X of Y), and timestamps.
-  - Filter by category: *All*, *PDF*, *eBooks*, *Office*, *Comics*, *Text & Code*.
-  - Instant title and format search.
-  - Pin favorite documents to the top.
-- **👓 Immersive Reader Experience**:
-  - Distraction-free full-screen reading mode (tap anywhere to toggle toolbars).
-  - Smooth vertical scrolling with zero frame drops.
-  - Interactive page scrubber and slider to jump instantly to any page.
-  - Remembers your exact reading position when you reopen any file.
+- **🛡️ 100% Private & Offline**: No `android.permission.INTERNET` requested. Documents never leave your device.
+- **🔒 Active Content Protection**: Macros, scripts, and embedded active content are strictly blocked.
+- **🔍 Find in Document**: In-document text search with match counts and next/previous match navigation.
+- **📑 Table of Contents (TOC)**: Outline drawer to jump instantly between chapters and sections.
 - **🎨 Reading Themes**:
-  - **AMOLED Dark**: Deep `#121212` background, battery-friendly for OLED screens.
-  - **Light Paper**: Crisp `#FFFFFF` reading surface with high contrast.
-  - **Warm Sepia**: Amber `#FBF0D9` tone designed to reduce eye strain during long reading sessions.
-- **🔤 Reflow & Text Resizing**:
-  - Increase or decrease font size (`A-` / `A+`) on reflowable documents (EPUB, MOBI, DOCX, Markdown, Text).
-- **🔍 Zoom & Pan**:
-  - Double-tap or pinch-to-zoom to inspect small text, diagrams, or high-res comic art.
-- **🚀 Ultra-low RAM & Storage footprint**:
-  - **Byte-budgeted LRU cache (`PageCache`)**: Limits bitmap memory to 8 MB - 32 MB max, regardless of whether a document has 10 or 3,000 pages.
-  - **Per-ABI APK splits**: Downloads only native binaries for your phone's architecture (`arm64-v8a` / `armeabi-v7a`).
+  - **AMOLED Dark**: `#121212` background, battery-saving for OLED screens.
+  - **Light Paper**: `#FFFFFF` crisp reading surface.
+  - **Warm Sepia**: `#FBF0D9` amber tone designed to reduce eye strain.
+- **🔤 Reflow & Text Resizing**: Increase or decrease font size (`A-` / `A+`) on reflowable documents (Word, EPUB, MOBI, Markdown, Text).
+- **🔎 Zoom & Pan**: Pinch-to-zoom or double-tap to inspect small text, diagrams, and high-res comic art.
+- **⚡ Ultra-low RAM Footprint**:
+  - **Byte-budgeted LRU cache (`PageCache`)**: Limits bitmap memory to 8–32 MB max regardless of whether a document has 10 or 3,000 pages.
+  - **Per-ABI APK splits**: Ships only native binaries for your phone's architecture (`arm64-v8a` / `armeabi-v7a`).
+- **📚 Library & Recents**:
+  - Automatically records recently opened files, reading progress (Page X of Y), and timestamps.
+  - Filter by category: *All*, *PDF & Fixed*, *Word & Docs*, *eBooks & Comics*, *Spreadsheets*, *Presentations*, *Text & Code*, *Images*, *Archives*.
 
 ---
 
@@ -57,23 +58,46 @@ By leveraging a single native C core ([MuPDF](https://mupdf.com)) combined with 
 
 ```
 app/src/main/java/com/simbuild/folia/
-├── MainActivity.kt               # Navigation router & SAF OpenDocument intent handler
-├── ReaderScreen.kt               # Reader UI (controls, slider, themes, zoom, cache)
+├── MainActivity.kt                  # Navigation router & SAF OpenDocument intent handler
+├── ReaderScreen.kt                  # Reader UI (search, TOC, scrubber, zoom, themes)
 ├── model/
-│   └── RecentDocument.kt         # Document metadata & reading progress model
+│   └── RecentDocument.kt            # Document metadata & reading progress model
 ├── data/
-│   └── RecentDocumentsRepository.kt # SharedPreferences persistence (JSON)
+│   └── RecentDocumentsRepository.kt    # SharedPreferences persistence (JSON)
 ├── engine/
-│   ├── DocEngine.kt              # Format-agnostic interface & SAF URI streaming
-│   ├── MuPdfEngine.kt            # MuPDF JNI bindings & page lifecycle management
-│   ├── FormatConverter.kt        # Markdown / CSV / Code to HTML typography converter
-│   └── PageCache.kt              # Byte-budgeted LRU Bitmap cache
+│   ├── DocEngine.kt                 # Format-agnostic interface & SAF URI streaming
+│   ├── FormatRegistry.kt            # 100+ format registry & magic-byte sniffer
+│   ├── MuPdfEngine.kt               # MuPDF Fitz JNI bindings & page lifecycle management
+│   ├── FormatConverter.kt           # Word (.docx, .doc, .rtf, .odt) to HTML converter
+│   ├── SpreadsheetConverter.kt      # Excel (.xlsx, .xls), ODS, CSV/TSV table converter
+│   ├── PresentationConverter.kt     # PowerPoint (.pptx, .ppt), ODP slide deck converter
+│   ├── StructuredTextConverter.kt   # Code, safe HTML, Email, vCard, Calendar converter
+│   ├── ArchiveConverter.kt          # Safe archive browser (Zip-slip & Zip-bomb safe)
+│   ├── ImageDocEngine.kt            # Memory-safe image decoder & sanitized SVG
+│   ├── UnsupportedDocEngine.kt      # Honest compatibility informer for proprietary DTP/CAD
+│   └── PageCache.kt                 # Byte-budgeted LRU Bitmap cache
 └── ui/
     ├── home/
-    │   └── HomeScreen.kt         # Library screen, filter chips, search & cards
+    │   └── HomeScreen.kt            # Library screen, filter chips, search & cards
     └── theme/
-        ├── Color.kt              # Folia brand & format-specific badge colors
-        └── Theme.kt              # Material 3 light/dark color schemes
+        ├── Color.kt                 # Format-specific badge colors
+        └── Theme.kt                 # Material 3 light/dark color schemes
+```
+
+---
+
+## 🧪 Testing & Test Fixtures
+
+Automated unit tests and fixtures are located in:
+- `app/src/test/java/com/simbuild/folia/FormatRegistryTest.kt`
+- `app/src/test/java/com/simbuild/folia/FormatSnifferTest.kt`
+- `app/src/test/java/com/simbuild/folia/SecurityAndConvertersTest.kt`
+- `app/src/test/java/com/simbuild/folia/FixtureVerificationTest.kt`
+- `app/src/test/resources/fixtures/`: Real sample test fixtures for `.docx`, `.xlsx`, `.pptx`, `.csv`, `.tsv`, `.md`, `.json`, `.xml`, `.kt`, `.eml`, `.vcf`, `.ics`, and `.txt`.
+
+To execute the test suite:
+```bash
+./gradlew testDebugUnitTest
 ```
 
 ---
@@ -88,7 +112,7 @@ app/src/main/java/com/simbuild/folia/
 ### Steps
 1. Clone this repository:
    ```bash
-   git clone https://github.com/<your-username>/folia.git
+   git clone https://github.com/Aasimabdul/folia.git
    cd folia
    ```
 2. Build debug APK:
@@ -102,4 +126,4 @@ app/src/main/java/com/simbuild/folia/
 
 ## 📄 License
 
-This project is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.html) in accordance with the MuPDF library licensing terms.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** in accordance with the MuPDF library licensing terms.

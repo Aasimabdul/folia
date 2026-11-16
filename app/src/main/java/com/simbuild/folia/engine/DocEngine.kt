@@ -7,7 +7,25 @@ import android.provider.OpenableColumns
 import java.io.File
 
 /**
- * Common abstraction for all document formats in Folia.
+ * Table of contents chapter/section record.
+ */
+data class TocItem(
+    val title: String,
+    val page: Int,
+    val level: Int = 0
+)
+
+/**
+ * In-document search result match.
+ */
+data class SearchResult(
+    val page: Int,
+    val snippet: String,
+    val matchIndex: Int = 0
+)
+
+/**
+ * Common modular abstraction for all document formats in Folia.
  */
 interface DocEngine : AutoCloseable {
     val title: String
@@ -15,7 +33,10 @@ interface DocEngine : AutoCloseable {
     val fileSize: Long
     val pageCount: Int
 
-    /** true for EPUB/MOBI/FB2/TXT/HTML/Markdown/Office: text reflows to the screen */
+    /** Explicit capability status */
+    val supportStatus: SupportLevel get() = SupportLevel.NATIVE_RENDERING
+
+    /** True for reflowable documents: text wraps and adapts to screen width */
     val isReflowable: Boolean
 
     /** Page size in points (1/72 inch). */
@@ -26,62 +47,104 @@ interface DocEngine : AutoCloseable {
 
     /** Reflow text documents for the current screen. */
     fun relayout(widthPt: Float, heightPt: Float, fontSizePt: Float)
+
+    /** Extract plain text from page for search, clipboard copy, or accessibility. */
+    fun extractText(index: Int): String? = null
+
+    /** Retrieve table of contents (TOC / Outlines) if available. */
+    fun tableOfContents(): List<TocItem> = emptyList()
+
+    /** Search document for occurrences of query string. */
+    fun search(query: String): List<SearchResult> = emptyList()
 }
 
+/**
+ * Modular document dispatcher that sniffs formats and routes to the appropriate handler.
+ */
 object DocEngines {
 
     fun open(context: Context, uri: Uri): DocEngine {
         val name = displayName(context, uri)
-        val ext = name.substringAfterLast('.', "").lowercase()
-        val formatName = detectFormatName(ext)
 
         val dir = File(context.cacheDir, "open").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
-        val rawFile = File(dir, "raw.$ext")
 
+        // Stream SAF URI safely into a private temporary file
+        val tempRaw = File(dir, "source_document")
         context.contentResolver.openInputStream(uri)?.use { input ->
-            rawFile.outputStream().use { out -> input.copyTo(out, 64 * 1024) }
-        } ?: error("Cannot open document stream")
+            tempRaw.outputStream().use { out -> input.copyTo(out, 64 * 1024) }
+        } ?: error("Cannot read document stream from provider: $uri")
 
-        val targetFile = when (ext) {
-            "md", "markdown", "csv", "docx", "doc", "rtf", "odt" -> {
-                val htmlFile = File(dir, "doc.html")
-                FormatConverter.convertToHtmlFile(rawFile, ext, htmlFile)
-                htmlFile
-            }
-            "djvu", "djv" -> throw UnsupportedOperationException("DJVU support is in development")
-            "cbr", "rar" -> throw UnsupportedOperationException("CBR support is in development")
-            else -> rawFile
-        }
+        // 1. Identify format using magic bytes and container inspection
+        val formatInfo = FormatRegistry.sniffFormat(tempRaw, uri, name)
+        val ext = formatInfo.extension
+        val rawFile = File(dir, "raw.$ext")
+        tempRaw.renameTo(rawFile)
 
         val size = rawFile.length()
-        return MuPdfEngine.open(
-            path = targetFile.absolutePath,
-            title = name,
-            format = formatName,
-            fileSize = size
-        )
-    }
 
-    fun detectFormatName(ext: String): String = when (ext.lowercase()) {
-        "pdf" -> "PDF"
-        "epub" -> "EPUB"
-        "mobi" -> "MOBI"
-        "fb2" -> "FB2"
-        "docx" -> "DOCX"
-        "doc" -> "DOC"
-        "rtf" -> "RTF"
-        "odt" -> "ODT"
-        "xlsx", "xls" -> "XLSX"
-        "pptx", "ppt" -> "PPTX"
-        "cbz" -> "CBZ"
-        "cbr" -> "CBR"
-        "xps", "oxps" -> "XPS"
-        "md", "markdown" -> "MARKDOWN"
-        "txt", "text", "log" -> "TXT"
-        "csv" -> "CSV"
-        "html", "htm" -> "HTML"
-        else -> ext.uppercase().ifEmpty { "DOC" }
+        // 2. Select appropriate handler according to format category
+        return when (formatInfo.category) {
+            FormatCategory.IMAGE_SCANNED -> {
+                if (ext == "svg") {
+                    val htmlFile = File(dir, "doc.html")
+                    StructuredTextConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                    MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+                } else {
+                    ImageDocEngine.open(rawFile, name, formatInfo.displayName, size)
+                }
+            }
+
+            FormatCategory.SPREADSHEET -> {
+                val htmlFile = File(dir, "doc.html")
+                SpreadsheetConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+
+            FormatCategory.PRESENTATION -> {
+                val htmlFile = File(dir, "doc.html")
+                PresentationConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+
+            FormatCategory.STRUCTURED_TEXT_CODE -> {
+                val htmlFile = File(dir, "doc.html")
+                StructuredTextConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+
+            FormatCategory.ARCHIVE -> {
+                val htmlFile = File(dir, "doc.html")
+                ArchiveConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+
+            FormatCategory.WORD_PROCESSING -> {
+                val htmlFile = File(dir, "doc.html")
+                FormatConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+
+            FormatCategory.PDF_FIXED, FormatCategory.EBOOK_COMIC -> {
+                if (formatInfo.supportLevel == SupportLevel.PARTIAL_SUPPORT) {
+                    val htmlFile = File(dir, "doc.html")
+                    UnsupportedDocEngine.convertToHtmlFile(rawFile, ext, formatInfo, htmlFile)
+                    MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+                } else {
+                    MuPdfEngine.open(rawFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+                }
+            }
+
+            FormatCategory.TECHNICAL_DTP -> {
+                val htmlFile = File(dir, "doc.html")
+                if (ext in listOf("eml", "msg", "ics", "vcf")) {
+                    StructuredTextConverter.convertToHtmlFile(rawFile, ext, htmlFile)
+                } else {
+                    UnsupportedDocEngine.convertToHtmlFile(rawFile, ext, formatInfo, htmlFile)
+                }
+                MuPdfEngine.open(htmlFile.absolutePath, name, formatInfo.displayName, size, formatInfo.supportLevel)
+            }
+        }
     }
 
     fun displayName(context: Context, uri: Uri): String {

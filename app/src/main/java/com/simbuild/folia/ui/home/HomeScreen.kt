@@ -80,7 +80,17 @@ fun HomeScreen(
     var selectedCategory by remember { mutableStateOf("All") }
     var showAboutDialog by remember { mutableStateOf(false) }
 
-    val categories = listOf("All", "PDF", "eBooks", "Office", "Comics", "Text & Code")
+    val categories = listOf(
+        "All",
+        "PDF & Fixed",
+        "Word & Docs",
+        "eBooks & Comics",
+        "Spreadsheets",
+        "Presentations",
+        "Text & Code",
+        "Images",
+        "Archives"
+    )
 
     val filteredList = remember(recentDocuments, searchQuery, selectedCategory) {
         recentDocuments.filter { doc ->
@@ -90,11 +100,14 @@ fun HomeScreen(
 
             val matchesCategory = when (selectedCategory) {
                 "All" -> true
-                "PDF" -> doc.format.equals("PDF", ignoreCase = true)
-                "eBooks" -> doc.format in listOf("EPUB", "MOBI", "FB2")
-                "Office" -> doc.format in listOf("DOCX", "XLSX", "PPTX", "DOC", "XLS", "PPT", "RTF", "ODT")
-                "Comics" -> doc.format in listOf("CBZ", "CBR")
-                "Text & Code" -> doc.format in listOf("TXT", "MARKDOWN", "MD", "CSV", "HTML")
+                "PDF & Fixed" -> doc.format in listOf("PDF", "XPS", "OXPS", "DJVU", "CHM")
+                "Word & Docs" -> doc.format in listOf("DOCX", "DOC", "DOCM", "DOT", "DOTX", "ODT", "OTT", "RTF", "WPD", "WPS")
+                "eBooks & Comics" -> doc.format in listOf("EPUB", "MOBI", "FB2", "AZW", "AZW3", "CBZ", "CBR")
+                "Spreadsheets" -> doc.format in listOf("XLSX", "XLS", "XLSM", "XLSB", "ODS", "OTS", "CSV", "TSV")
+                "Presentations" -> doc.format in listOf("PPTX", "PPT", "PPTM", "PPS", "PPSX", "ODP", "OTP")
+                "Text & Code" -> doc.format in listOf("TXT", "MARKDOWN", "MD", "RST", "TEX", "HTML", "XML", "JSON", "YAML", "YML", "LOG", "SQL", "PY", "JAVA", "KT", "C", "CPP", "JS", "TS", "SH")
+                "Images" -> doc.format in listOf("JPG", "JPEG", "PNG", "WEBP", "GIF", "BMP", "TIFF", "SVG", "ICO")
+                "Archives" -> doc.format in listOf("ZIP", "7Z", "RAR", "TAR", "GZ")
                 else -> true
             }
 
@@ -439,7 +452,10 @@ private fun AboutFoliaDialog(onDismiss: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text("Folia is an open-source, all-format document and eBook reader.")
+                Text("Universal open-source document reading platform:")
+                Text("• PDF & Fixed: PDF, XPS, OpenXPS, DJVU, CHM\n• Word: DOCX, DOC, DOCM, ODT, RTF, WPD\n• eBooks: EPUB, MOBI, FB2, AZW, CBZ, CBR\n• Spreadsheets: XLSX, XLS, ODS, CSV, TSV\n• Presentations: PPTX, PPT, ODP\n• Code & Text: Markdown, Code (25+ langs), HTML\n• Images: JPG, PNG, WebP, GIF, BMP, TIFF, SVG\n• Archives: ZIP, TAR, GZ with safe browsing\n\n🛡️ 100% Offline • Zero Tracking • Sandboxed", fontSize = 12.sp)
+            }
+        },
                 Text("• Engine: MuPDF native JNI engine")
                 Text("• Supported formats: PDF, EPUB, MOBI, FB2, DOCX, XLSX, PPTX, CBZ, TXT, Markdown, CSV")
                 Text("• Privacy: Fully offline, no analytics, no ads, no cloud sync")
