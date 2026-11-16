@@ -8,8 +8,8 @@ val FoliaPrimaryDark = Color(0xFF1B5E20)
 val FoliaSecondary = Color(0xFF455A64)
 
 // Reading Mode Themes
-val DarkReadingBg = Color(0xFF121212)
-val DarkReadingSurface = Color(0xFF1E1E1E)
+val DarkReadingBg = Color(0xFF1E1E1E)
+val DarkReadingSurface = Color(0xFF252526)
 val DarkReadingText = Color(0xFFE0E0E0)
 
 val LightReadingBg = Color(0xFFF9F9FB)

@@ -40,7 +40,7 @@ Folia adheres to strict capability reporting: every format has an explicit statu
 - **🔍 Find in Document**: In-document text search with match counts and next/previous match navigation.
 - **📑 Table of Contents (TOC)**: Outline drawer to jump instantly between chapters and sections.
 - **🎨 Reading Themes**:
-  - **AMOLED Dark**: `#121212` background, battery-saving for OLED screens.
+  - **Dark**: `#1E1E1E` background, comfortable eye-friendly dark surface.
   - **Light Paper**: `#FFFFFF` crisp reading surface.
   - **Warm Sepia**: `#FBF0D9` amber tone designed to reduce eye strain.
 - **🔤 Reflow & Text Resizing**: Increase or decrease font size (`A-` / `A+`) on reflowable documents (Word, EPUB, MOBI, Markdown, Text).
