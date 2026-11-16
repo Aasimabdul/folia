@@ -82,28 +82,24 @@ class MuPdfEngine private constructor(
     override fun tableOfContents(): List<TocItem> = synchronized(lock) {
         val list = mutableListOf<TocItem>()
         try {
-            val outlines = doc.loadOutline()
-            if (outlines != null) {
-                for (outline in outlines) {
-                    collectOutline(outline, 0, list)
-                }
+            doc.loadOutline()?.let { outlines ->
+                collectOutlines(outlines, 0, list)
             }
         } catch (_: Exception) {}
-        return list
+        list
     }
 
-    private fun collectOutline(outline: Outline, level: Int, list: MutableList<TocItem>) {
-        val title = outline.title ?: "Chapter"
-        val page = try { outline.page } catch (_: Exception) { 0 }
-        list.add(TocItem(title = title, page = page.coerceAtLeast(0), level = level))
-
-        val down = outline.down
-        if (down != null) {
-            collectOutline(down, level + 1, list)
-        }
-        val next = outline.next
-        if (next != null) {
-            collectOutline(next, level, list)
+    private fun collectOutlines(outlines: Array<Outline>, level: Int, list: MutableList<TocItem>) {
+        for (outline in outlines) {
+            val title = outline.title?.takeIf { it.isNotBlank() } ?: "Chapter"
+            // MuPDF exposes outline destinations as URIs rather than a page property.
+            // Parse common internal "#page=N" destinations; unknown links safely default to page 0.
+            val page = outline.uri
+                ?.let { Regex("(?:page=|#)(\\d+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                ?.minus(1)
+                ?.coerceAtLeast(0) ?: 0
+            list.add(TocItem(title = title, page = page, level = level))
+            outline.down?.let { children -> collectOutlines(children, level + 1, list) }
         }
     }
 
