@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = FoliaPrimaryLight,
-    onPrimary = Color.Black,
+    onPrimary = Color.White,
     primaryContainer = FoliaPrimaryDark,
     onPrimaryContainer = Color.White,
     secondary = FoliaSecondary,
@@ -22,8 +22,8 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = FoliaPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFC8E6C9),
-    onPrimaryContainer = FoliaPrimaryDark,
+    primaryContainer = Color(0xFFE5E9FF),
+    onPrimaryContainer = Color(0xFF263B99),
     secondary = FoliaSecondary,
     background = LightReadingBg,
     surface = LightReadingSurface,
