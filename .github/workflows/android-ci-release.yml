@@ -33,8 +33,38 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
 
+      - name: Prepare release signing key (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.FOLIA_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/folia-release.jks"
+            echo "FOLIA_KEYSTORE_PATH=$RUNNER_TEMP/folia-release.jks" >> "$GITHUB_ENV"
+            echo "Signing with the release keystore from repository secrets."
+          else
+            echo "No FOLIA_KEYSTORE_BASE64 secret set; release APKs fall back to debug signing."
+          fi
+
       - name: Build debug and release APKs
+        env:
+          FOLIA_KEYSTORE_PASSWORD: ${{ secrets.FOLIA_KEYSTORE_PASSWORD }}
+          FOLIA_KEY_ALIAS: ${{ secrets.FOLIA_KEY_ALIAS }}
+          FOLIA_KEY_PASSWORD: ${{ secrets.FOLIA_KEY_PASSWORD }}
         run: ./gradlew assembleDebug assembleRelease
+
+      - name: Verify release APKs are signed
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER="$(ls "$SDK"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          COUNT=0
+          for apk in app/build/outputs/apk/release/*.apk; do
+            echo "Verifying $apk"
+            "$APKSIGNER" verify --print-certs "$apk"
+            COUNT=$((COUNT + 1))
+          done
+          test "$COUNT" -gt 0
 
       - name: Upload APK build artifacts
         uses: actions/upload-artifact@v4
@@ -63,10 +93,9 @@ jobs:
           ## Folia ${TAG}
 
           ### What's new
-          - Refined minimalist paper-and-blue visual identity.
-          - Updated light and dark surfaces for a calmer reading experience.
-          - Polished home-screen spacing, copy, and navigation elevation.
-          - Bumped Android version to ${VERSION} (version code 3).
+          - Release APKs are now signed, so they install on phones (fixes "App not installed").
+          - New Folia leaf app icon, with themed icon support on Android 13+.
+          - Bumped Android version to ${VERSION} (version code 4).
 
           ### Downloads
           Choose the APK matching your device architecture. Most modern Android phones use **arm64-v8a**.

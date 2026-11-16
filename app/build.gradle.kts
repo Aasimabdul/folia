@@ -14,11 +14,26 @@ android {
         applicationId = "com.simbuild.folia"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
 
         // ABI selection is configured only in splits. Do not also set ndk.abiFilters,
         // because Android Gradle Plugin rejects using both filters together.
+    }
+
+    // Android refuses to install an unsigned APK ("App not installed"), so release builds are always signed.
+    // With a real release key (FOLIA_KEYSTORE_* variables, set from GitHub secrets in CI) the APK is signed
+    // with it. Without one, it falls back to the debug key so the APK still installs.
+    val releaseKeystorePath: String? = System.getenv("FOLIA_KEYSTORE_PATH")
+    signingConfigs {
+        if (releaseKeystorePath != null && file(releaseKeystorePath).exists()) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv("FOLIA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FOLIA_KEY_ALIAS")
+                keyPassword = System.getenv("FOLIA_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -26,6 +41,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
