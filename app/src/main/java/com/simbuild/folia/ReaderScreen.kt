@@ -590,8 +590,6 @@ fun ReaderScreen(
         )
     }
 
-}
-
 @Composable
 private fun InfoItem(label: String, value: String) {
     Row(
