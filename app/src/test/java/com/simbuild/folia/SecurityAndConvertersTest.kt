@@ -78,7 +78,7 @@ class SecurityAndConvertersTest {
         val csvContent = """
             Product,Price,Quantity
             "Mechanical Keyboard, RGB",129.99,5
-            "UltraWide Monitor, 34""",499.50,2
+            "UltraWide Monitor, 34""${'"'},499.50,2
             USB-C Cable,14.99,10
         """.trimIndent()
 
