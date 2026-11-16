@@ -14,8 +14,8 @@ android {
         applicationId = "com.simbuild.folia"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         // Low space: ship only the ABIs real phones use. Drop armeabi-v7a to save ~40% more.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
