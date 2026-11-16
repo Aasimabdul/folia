@@ -17,8 +17,8 @@ android {
         versionCode = 3
         versionName = "0.3.0"
 
-        // Low space: ship only the ABIs real phones use. Drop armeabi-v7a to save ~40% more.
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        // ABI selection is configured only in splits. Do not also set ndk.abiFilters,
+        // because Android Gradle Plugin rejects using both filters together.
     }
 
     buildTypes {
