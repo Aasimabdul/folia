@@ -537,13 +537,13 @@ private fun LibraryDocumentRow(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
-    val formattedDate = remember(doc.lastOpenedTimestamp) {
+    val formattedDate = remember(doc.lastReadTime) {
         val now = System.currentTimeMillis()
-        val diff = now - doc.lastOpenedTimestamp
+        val diff = now - doc.lastReadTime
         when {
             diff < 24 * 60 * 60 * 1000L -> "Opened today"
             diff < 48 * 60 * 60 * 1000L -> "Opened yesterday"
-            else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(doc.lastOpenedTimestamp))
+            else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(doc.lastReadTime))
         }
     }
 
