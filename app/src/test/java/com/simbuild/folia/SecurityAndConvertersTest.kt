@@ -78,7 +78,7 @@ class SecurityAndConvertersTest {
         val csvContent = """
             Product,Price,Quantity
             "Mechanical Keyboard, RGB",129.99,5
-            "UltraWide Monitor, 34\"",499.50,2
+            "UltraWide Monitor, 34""",499.50,2
             USB-C Cable,14.99,10
         """.trimIndent()
 
@@ -90,7 +90,8 @@ class SecurityAndConvertersTest {
 
         assertTrue("Table header should exist", result.contains("<th>Product</th>"))
         assertTrue("Quoted comma in field should be handled", result.contains("Mechanical Keyboard, RGB"))
-        assertTrue("Escaped quotes should be cleaned", result.contains("UltraWide Monitor, 34\""))
+        // CSV "" becomes a single quote character, which is then HTML-escaped for display
+        assertTrue("Escaped quotes should be cleaned", result.contains("UltraWide Monitor, 34&quot;"))
         assertTrue("Row element should be rendered", result.contains("<td>129.99</td>"))
     }
 

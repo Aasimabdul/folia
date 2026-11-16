@@ -51,19 +51,19 @@ object StructuredTextConverter {
         return sb.toString()
     }
 
-    private fun highlightKeywords(escaped: String): String {
-        // Fast keyword highlighting without external runtimes
-        val keywords = listOf(
+    // Fast keyword highlighting without external runtimes.
+    // One single-pass regex: replacing keyword by keyword would also match the word "class"
+    // inside the <span class="kw"> markup that earlier replacements inserted, corrupting the HTML.
+    private val keywordRegex = Regex(
+        "\\b(?:" + listOf(
             "fun", "class", "val", "var", "import", "package", "return", "if", "else", "for", "while",
             "public", "private", "protected", "override", "def", "from", "async", "await", "function",
             "const", "let", "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "JOIN"
-        )
-        var result = escaped
-        for (kw in keywords) {
-            result = result.replace(Regex("\\b$kw\\b"), "<span class=\"kw\">$kw</span>")
-        }
-        return result
-    }
+        ).joinToString("|") + ")\\b"
+    )
+
+    private fun highlightKeywords(escaped: String): String =
+        keywordRegex.replace(escaped) { "<span class=\"kw\">${it.value}</span>" }
 
     // =========================================================================
     // Safe HTML Sanitization (Active Content Blocked)

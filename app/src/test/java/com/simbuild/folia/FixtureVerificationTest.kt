@@ -69,7 +69,9 @@ class FixtureVerificationTest {
         assertTrue(csvFile.exists())
         val csvHtml = tempFolder.newFile("csv_out.html")
         SpreadsheetConverter.convertToHtmlFile(csvFile, "csv", csvHtml)
-        assertTrue(csvHtml.readText().contains("<th>PDF Engine</th>"))
+        val csvOut = csvHtml.readText()
+        assertTrue("Header row uses <th>", csvOut.contains("<th>Name</th>"))
+        assertTrue("Data rows use <td>", csvOut.contains("<td>PDF Engine</td>"))
 
         val tsvFile = File(fixturesDir, "sample.tsv")
         assertTrue(tsvFile.exists())
@@ -90,7 +92,8 @@ class FixtureVerificationTest {
         assertTrue(jsonFile.exists())
         val jsonHtml = tempFolder.newFile("json_out.html")
         StructuredTextConverter.convertToHtmlFile(jsonFile, "json", jsonHtml)
-        assertTrue(jsonHtml.readText().contains("\"app\": \"Folia\""))
+        // Quotes are HTML-escaped on purpose (shown as text, never parsed as markup)
+        assertTrue(jsonHtml.readText().contains("&quot;app&quot;: &quot;Folia&quot;"))
     }
 
     @Test
