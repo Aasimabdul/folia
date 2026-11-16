@@ -447,148 +447,148 @@ fun ReaderScreen(
                 }
             }
         }
-    }
-
-    if (showInfoDialog) {
-        DocumentInfoDialog(
-            engine = engine,
-            currentPage = currentPage + 1,
-            onDismiss = { showInfoDialog = false }
-        )
-    }
-
-    if (showTocDialog) {
-        val toc = remember(engine) { engine.tableOfContents() }
-        TocDialog(
-            tocItems = toc,
-            onSelectPage = { page ->
-                coroutineScope.launch {
-                    listState.animateScrollToItem(page.coerceIn(0, (engine.pageCount - 1).coerceAtLeast(0)))
-                }
-                showTocDialog = false
-            },
-            onDismiss = { showTocDialog = false }
-        )
-    }
-}
-
-@Composable
-private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int) {
-    val density = LocalDensity.current
-
-    val aspect = remember(engine, index) {
-        runCatching { engine.pageSize(index).let { (w, h) -> h / w } }.getOrDefault(1.4f)
-    }
-    val heightDp = with(density) { (widthPx * aspect).toInt().toDp() }
-
-    val bitmap by produceState(initialValue = cache.get(index), engine, index, widthPx) {
-        if (value == null) {
-            value = withContext(Dispatchers.Default) {
-                runCatching { engine.render(index, widthPx) }.getOrNull()?.also { cache.put(index, it) }
-            }
+        if (showInfoDialog) {
+            DocumentInfoDialog(
+                engine = engine,
+                currentPage = currentPage + 1,
+                onDismiss = { showInfoDialog = false }
+            )
         }
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(heightDp)
-            .padding(vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        bitmap?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = "Page ${index + 1}",
-                contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxSize()
+    
+        if (showTocDialog) {
+            val toc = remember(engine) { engine.tableOfContents() }
+            TocDialog(
+                tocItems = toc,
+                onSelectPage = { page ->
+                    coroutineScope.launch {
+                        listState.animateScrollToItem(page.coerceIn(0, (engine.pageCount - 1).coerceAtLeast(0)))
+                    }
+                    showTocDialog = false
+                },
+                onDismiss = { showTocDialog = false }
             )
         }
     }
-}
-
-@Composable
-private fun TocDialog(
-    tocItems: List<TocItem>,
-    onSelectPage: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Table of Contents", fontWeight = FontWeight.Bold) },
-        text = {
-            if (tocItems.isEmpty()) {
-                Text("No table of contents outline available for this document.")
-            } else {
-                LazyColumn(modifier = Modifier.height(320.dp)) {
-                    items(tocItems) { item ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSelectPage(item.page) }
-                                .padding(vertical = 10.dp, horizontal = (item.level * 16).dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = item.title,
-                                modifier = Modifier.weight(1f),
-                                fontSize = 14.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "p. ${item.page + 1}",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+    
+    @Composable
+    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int) {
+        val density = LocalDensity.current
+    
+        val aspect = remember(engine, index) {
+            runCatching { engine.pageSize(index).let { (w, h) -> h / w } }.getOrDefault(1.4f)
+        }
+        val heightDp = with(density) { (widthPx * aspect).toInt().toDp() }
+    
+        val bitmap by produceState(initialValue = cache.get(index), engine, index, widthPx) {
+            if (value == null) {
+                value = withContext(Dispatchers.Default) {
+                    runCatching { engine.render(index, widthPx) }.getOrNull()?.also { cache.put(index, it) }
+                }
+            }
+        }
+    
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(heightDp)
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            bitmap?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Page ${index + 1}",
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+    
+    @Composable
+    private fun TocDialog(
+        tocItems: List<TocItem>,
+        onSelectPage: (Int) -> Unit,
+        onDismiss: () -> Unit
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Table of Contents", fontWeight = FontWeight.Bold) },
+            text = {
+                if (tocItems.isEmpty()) {
+                    Text("No table of contents outline available for this document.")
+                } else {
+                    LazyColumn(modifier = Modifier.height(320.dp)) {
+                        items(tocItems) { item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelectPage(item.page) }
+                                    .padding(vertical = 10.dp, horizontal = (item.level * 16).dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = item.title,
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "p. ${item.page + 1}",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Close") }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+        )
+    }
+    
+    @Composable
+    private fun DocumentInfoDialog(
+        engine: DocEngine,
+        currentPage: Int,
+        onDismiss: () -> Unit
+    ) {
+        val sizeText = remember(engine.fileSize) {
+            val bytes = engine.fileSize
+            when {
+                bytes < 1024 -> "$bytes B"
+                bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+                else -> "%.2f MB".format(bytes / (1024.0 * 1024.0))
+            }
         }
-    )
-}
-
-@Composable
-private fun DocumentInfoDialog(
-    engine: DocEngine,
-    currentPage: Int,
-    onDismiss: () -> Unit
-) {
-    val sizeText = remember(engine.fileSize) {
-        val bytes = engine.fileSize
-        when {
-            bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
-            else -> "%.2f MB".format(bytes / (1024.0 * 1024.0))
-        }
+    
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Document Info", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoItem("Title", engine.title)
+                    InfoItem("Format", engine.format)
+                    InfoItem("Capability", engine.supportStatus.label)
+                    InfoItem("Total Pages", "${engine.pageCount}")
+                    InfoItem("Current Page", "$currentPage")
+                    if (engine.fileSize > 0) {
+                        InfoItem("File Size", sizeText)
+                    }
+                    InfoItem("Layout Mode", if (engine.isReflowable) "Reflowable (Adjustable text)" else "Fixed Page")
+                    InfoItem("Security", "100% Offline • Sandboxed")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Done") }
+            }
+        )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Document Info", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoItem("Title", engine.title)
-                InfoItem("Format", engine.format)
-                InfoItem("Capability", engine.supportStatus.label)
-                InfoItem("Total Pages", "${engine.pageCount}")
-                InfoItem("Current Page", "$currentPage")
-                if (engine.fileSize > 0) {
-                    InfoItem("File Size", sizeText)
-                }
-                InfoItem("Layout Mode", if (engine.isReflowable) "Reflowable (Adjustable text)" else "Fixed Page")
-                InfoItem("Security", "100% Offline • Sandboxed")
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
-        }
-    )
 }
 
 @Composable
