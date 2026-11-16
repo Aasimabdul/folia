@@ -96,7 +96,7 @@ object FormatConverter {
         return sb.toString()
     }
 
-    private fun parseRels(input: InputStream, relsMap: mutableMapOf<String, String>) {
+    private fun parseRels(input: InputStream, relsMap: MutableMap<String, String>) {
         try {
             val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
             val doc = dbf.newDocumentBuilder().parse(input)
