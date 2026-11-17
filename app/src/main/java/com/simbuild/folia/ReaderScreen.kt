@@ -61,6 +61,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,7 +109,9 @@ fun ReaderScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var isControlsVisible by remember { mutableStateOf(true) }
-    var readingTheme by remember { mutableStateOf(ReadingThemeMode.DARK) }
+    // The reader starts in the look that matches the app theme (the toggle in the top bar still cycles all three)
+    val appIsDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    var readingTheme by remember { mutableStateOf(if (appIsDark) ReadingThemeMode.DARK else ReadingThemeMode.LIGHT) }
     var fontSizePt by remember { mutableFloatStateOf(14f) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
@@ -221,7 +226,7 @@ fun ReaderScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(count = pageCount, key = { "$layoutVersion-$it" }) { index ->
-                    PageItem(engine, cache, index, widthPx)
+                    PageItem(engine, cache, index, widthPx, readingTheme)
                 }
             }
         }
@@ -472,7 +477,7 @@ fun ReaderScreen(
     }
 
     @Composable
-    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int) {
+    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int, readingTheme: ReadingThemeMode) {
         val density = LocalDensity.current
     
         val aspect = remember(engine, index) {
@@ -500,6 +505,7 @@ fun ReaderScreen(
                     bitmap = it.asImageBitmap(),
                     contentDescription = "Page ${index + 1}",
                     contentScale = ContentScale.FillWidth,
+                    colorFilter = pageColorFilter(readingTheme),
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -599,4 +605,35 @@ private fun InfoItem(label: String, value: String) {
         Text(text = label, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, fontWeight = FontWeight.Normal)
     }
+}
+
+/**
+ * Pages are rendered once as white-paper bitmaps and recolored at draw time, so switching the reading
+ * theme is instant and costs no extra memory (the page cache is not rebuilt).
+ *
+ * Each channel is mapped linearly: black -> `ink`, white -> `paper`.
+ *  - DARK:  white paper becomes the app's ink-navy (#12161E) and black text becomes soft off-white (#E6E8EE),
+ *           so pages look like the rest of the dark app instead of a bright white sheet.
+ *  - SEPIA: warm paper (#FBF0D9) with brown ink (#3E2D1D).
+ *  - LIGHT: untouched.
+ * Photos inside a page are recolored too, which is the usual trade-off of a night mode.
+ */
+private fun pageColorFilter(theme: ReadingThemeMode): ColorFilter? = when (theme) {
+    ReadingThemeMode.LIGHT -> null
+    ReadingThemeMode.DARK -> channelMap(ink = intArrayOf(230, 232, 238), paper = intArrayOf(18, 22, 30))
+    ReadingThemeMode.SEPIA -> channelMap(ink = intArrayOf(62, 45, 29), paper = intArrayOf(251, 240, 217))
+}
+
+private fun channelMap(ink: IntArray, paper: IntArray): ColorFilter {
+    fun scale(c: Int) = (paper[c] - ink[c]) / 255f
+    return ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                scale(0), 0f, 0f, 0f, ink[0].toFloat(),
+                0f, scale(1), 0f, 0f, ink[1].toFloat(),
+                0f, 0f, scale(2), 0f, ink[2].toFloat(),
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+    )
 }

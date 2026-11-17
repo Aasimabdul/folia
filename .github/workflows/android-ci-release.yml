@@ -93,9 +93,13 @@ jobs:
           ## Folia ${TAG}
 
           ### What's new
-          - Release APKs are now signed, so they install on phones (fixes "App not installed").
-          - New Folia leaf app icon, with themed icon support on Android 13+.
-          - Bumped Android version to ${VERSION} (version code 4).
+          - Folia now appears in the file manager's "Open with" list for documents (Just once / Always),
+            matching by file type and by file extension, and also in the share sheet.
+          - Opening a file from a file manager reuses the running app instead of starting a second copy.
+          - Theme switch in Settings: System default, Light or Dark (remembered).
+          - New dark palette: deep ink-navy surfaces, soft blue accent, readable contrast; dialogs, menus
+            and navigation follow it. Dark and sepia reading modes now recolor the pages themselves.
+          - Bumped Android version to ${VERSION} (version code 5).
 
           ### Downloads
           Choose the APK matching your device architecture. Most modern Android phones use **arm64-v8a**.

@@ -1,6 +1,11 @@
 <resources>
-    <style name="Theme.Folia" parent="android:Theme.Material.NoActionBar">
+    <!-- Light window by default; values-night/themes.xml swaps in the dark one.
+         Window background matches the app background so there is no white or black flash at start-up. -->
+    <style name="Theme.Folia" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/folia_window_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

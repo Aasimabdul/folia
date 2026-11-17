@@ -26,38 +26,78 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.IntentCompat
 import com.simbuild.folia.data.RecentDocumentsRepository
+import com.simbuild.folia.data.SettingsRepository
 import com.simbuild.folia.engine.DocEngine
 import com.simbuild.folia.engine.DocEngines
 import com.simbuild.folia.model.RecentDocument
 import com.simbuild.folia.ui.home.HomeScreen
+import com.simbuild.folia.ui.theme.AppThemeMode
 import com.simbuild.folia.ui.theme.FoliaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * A document handed to Folia by another app. The id makes every hand-over a new value, so opening the
+ * same file twice from the file manager still opens it again.
+ */
+private data class IncomingFile(val uri: Uri, val id: Long = System.nanoTime())
+
 class MainActivity : ComponentActivity() {
 
-    private var incoming by mutableStateOf<Uri?>(null)
+    private var incoming by mutableStateOf<IncomingFile?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        incoming = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data
+        incoming = documentFrom(intent)
         setContent {
-            FoliaTheme {
-                App(incoming)
+            val settings = remember { SettingsRepository(applicationContext) }
+            var themeMode by remember { mutableStateOf(settings.themeMode) }
+
+            FoliaTheme(themeMode = themeMode) {
+                App(
+                    incoming = incoming,
+                    themeMode = themeMode,
+                    onThemeModeChange = { mode ->
+                        themeMode = mode
+                        settings.themeMode = mode
+                    }
+                )
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == Intent.ACTION_VIEW) incoming = intent.data
+        setIntent(intent)
+        documentFrom(intent)?.let { incoming = it }
+    }
+
+    /** "Open with" (VIEW) and the share sheet (SEND) both carry a content URI for the document. */
+    private fun documentFrom(intent: Intent?): IncomingFile? {
+        if (intent == null) return null
+        val uri = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            else -> null
+        } ?: return null
+        // Keep read access for the Recent list when the sender allows it (not every provider does)
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: Exception) {
+        }
+        return IncomingFile(uri)
     }
 }
 
 @Composable
-private fun App(incoming: Uri?) {
+private fun App(
+    incoming: IncomingFile?,
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val repository = remember { RecentDocumentsRepository(context) }
@@ -68,6 +108,8 @@ private fun App(incoming: Uri?) {
     var engine by remember { mutableStateOf<DocEngine?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var initialPage by remember { mutableIntStateOf(0) }
+    // Bumped whenever a document is (re)opened so the same file can be opened again
+    var reloadToken by remember { mutableIntStateOf(0) }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -88,13 +130,15 @@ private fun App(incoming: Uri?) {
 
     LaunchedEffect(incoming) {
         if (incoming != null) {
-            initialPage = 0
-            currentUri = incoming
+            val existing = recentDocs.firstOrNull { it.uriString == incoming.uri.toString() }
+            initialPage = existing?.lastReadPage ?: 0
+            currentUri = incoming.uri
+            reloadToken++
         }
     }
 
     // Open the document off the main thread; always close previous engine
-    LaunchedEffect(currentUri) {
+    LaunchedEffect(currentUri, reloadToken) {
         val target = currentUri ?: return@LaunchedEffect
         isLoading = true
         engine?.close()
@@ -172,7 +216,9 @@ private fun App(incoming: Uri?) {
                 onRemoveRecent = { uriString ->
                     repository.removeRecentDocument(uriString)
                     recentDocs = repository.getRecentDocuments()
-                }
+                },
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange
             )
 
             if (isLoading) {

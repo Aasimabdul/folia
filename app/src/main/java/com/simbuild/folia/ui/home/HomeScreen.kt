@@ -3,7 +3,6 @@ package com.simbuild.folia.ui.home
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -67,15 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.simbuild.folia.model.RecentDocument
-import com.simbuild.folia.ui.theme.FolioAddBtnBg
-import com.simbuild.folia.ui.theme.FolioAddBtnBgDark
-import com.simbuild.folia.ui.theme.FolioForestGreen
-import com.simbuild.folia.ui.theme.FolioPillBg
-import com.simbuild.folia.ui.theme.FolioPillBgDark
-import com.simbuild.folia.ui.theme.FolioSageCard
-import com.simbuild.folia.ui.theme.FolioSageCardDark
-import com.simbuild.folia.ui.theme.FolioSubtleText
-import com.simbuild.folia.ui.theme.FolioSubtleTextDark
+import com.simbuild.folia.ui.theme.AppThemeMode
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -96,19 +89,22 @@ fun HomeScreen(
     onSelectRecent: (Uri) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onRemoveRecent: (String) -> Unit,
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    onThemeModeChange: (AppThemeMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    // Follow the theme that is actually applied (System / Light / Dark), not only the phone's setting
+    val colors = MaterialTheme.colorScheme
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf("Recent") }
     var selectedBottomNav by remember { mutableIntStateOf(0) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    val pillBg = if (isDark) FolioPillBgDark else FolioPillBg
-    val subtleColor = if (isDark) FolioSubtleTextDark else FolioSubtleText
-    val primaryColor = if (isDark) Color(0xFFC7DBC5) else FolioForestGreen
-    val cardBg = if (isDark) FolioSageCardDark else FolioSageCard
-    val addBtnBg = if (isDark) FolioAddBtnBgDark else FolioAddBtnBg
+    val pillBg = colors.surfaceContainer
+    val subtleColor = colors.onSurfaceVariant
+    val primaryColor = colors.primary
+    val cardBg = colors.surfaceContainerHigh
+    val addBtnBg = colors.primaryContainer
 
     val filteredDocs = remember(recentDocuments, searchQuery, selectedTab) {
         recentDocuments.filter { doc ->
@@ -315,7 +311,7 @@ fun HomeScreen(
                     listOf("Recent", "Saved", "Downloaded").forEach { tab ->
                         val isSelected = selectedTab == tab
                         val tabBg = if (isSelected) primaryColor else pillBg
-                        val tabText = if (isSelected) Color.White else subtleColor
+                        val tabText = if (isSelected) colors.onPrimary else subtleColor
 
                         Box(
                             modifier = Modifier
@@ -360,7 +356,11 @@ fun HomeScreen(
     }
 
     if (showSettingsDialog) {
-        SettingsInfoDialog(onDismiss = { showSettingsDialog = false })
+        SettingsDialog(
+            themeMode = themeMode,
+            onThemeModeChange = onThemeModeChange,
+            onDismiss = { showSettingsDialog = false }
+        )
     }
 }
 
@@ -456,7 +456,7 @@ private fun ContinueReadingHeroCard(
                 ) {
                     Text(
                         text = "Resume →",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -515,7 +515,7 @@ private fun EmptyHeroCard(
             ) {
                 Text(
                     text = "Open Document →",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -547,17 +547,31 @@ private fun LibraryDocumentRow(
         }
     }
 
-    // Palette for thumbnail book cover
-    val coverBg = remember(doc.format, doc.title) {
-        when (doc.format.uppercase()) {
-            "PDF" -> Color(0xFFE8DFD8)
-            "DOCX", "DOC" -> Color(0xFFD8E2EF)
-            "EPUB", "MOBI" -> Color(0xFFD9E4D7)
-            "XLSX", "CSV" -> Color(0xFFE2EED9)
-            "PPTX" -> Color(0xFFEFE2D8)
-            else -> Color(0xFFE5E5E5)
+    // Palette for thumbnail book cover: pastel on light themes, deep muted tones on dark themes
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val coverBg = remember(doc.format, isDark) {
+        val fmt = doc.format.uppercase()
+        if (isDark) {
+            when (fmt) {
+                "PDF" -> Color(0xFF4A3530)
+                "DOCX", "DOC" -> Color(0xFF2D3F55)
+                "EPUB", "MOBI" -> Color(0xFF2F4A3A)
+                "XLSX", "CSV" -> Color(0xFF384A2B)
+                "PPTX" -> Color(0xFF55402D)
+                else -> Color(0xFF353A47)
+            }
+        } else {
+            when (fmt) {
+                "PDF" -> Color(0xFFE8DFD8)
+                "DOCX", "DOC" -> Color(0xFFD8E2EF)
+                "EPUB", "MOBI" -> Color(0xFFD9E4D7)
+                "XLSX", "CSV" -> Color(0xFFE2EED9)
+                "PPTX" -> Color(0xFFEFE2D8)
+                else -> Color(0xFFE5E5E5)
+            }
         }
     }
+    val coverText = if (isDark) Color(0xFFE9ECF3) else Color(0xFF333333)
 
     Row(
         modifier = Modifier
@@ -583,7 +597,7 @@ private fun LibraryDocumentRow(
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 lineHeight = 10.sp,
-                color = Color(0xFF333333),
+                color = coverText,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
@@ -662,7 +676,7 @@ private fun FolioBottomNavBar(
     onSelectIndex: (Int) -> Unit
 ) {
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 0.dp
     ) {
         val items = listOf(
@@ -679,11 +693,11 @@ private fun FolioBottomNavBar(
                 icon = { Icon(icon, contentDescription = label) },
                 label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = FolioForestGreen,
-                    selectedTextColor = FolioForestGreen,
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = FolioSageCard
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
         }
@@ -691,16 +705,53 @@ private fun FolioBottomNavBar(
 }
 
 @Composable
-private fun SettingsInfoDialog(onDismiss: () -> Unit) {
+private fun SettingsDialog(
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Folia Settings & Info", fontWeight = FontWeight.Bold) },
+        title = { Text("Settings", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Version: 0.3.0 (Open Source)", fontWeight = FontWeight.SemiBold)
-                Text("Theme: Auto / Dark (#1E1E1E) / Warm Sepia / Light")
-                Text("Privacy: 100% Offline • Zero Analytics • No Network Permissions")
-                Text("Engine: MuPDF Fitz Core + Modular OpenXML & Stream Parsers")
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Theme",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AppThemeMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onThemeModeChange(mode) }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = themeMode == mode, onClick = { onThemeModeChange(mode) })
+                        Text(
+                            text = when (mode) {
+                                AppThemeMode.SYSTEM -> "System default"
+                                AppThemeMode.LIGHT -> "Light"
+                                AppThemeMode.DARK -> "Dark"
+                            }
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Text(
+                    text = "Folia ${com.simbuild.folia.BuildConfig.VERSION_NAME} · open source",
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "100% offline. No analytics, no network permission.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         },
         confirmButton = {
