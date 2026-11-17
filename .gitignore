@@ -47,6 +47,8 @@ captures/
 # Keystore files
 *.jks
 *.keystore
+# The public sideload key (see signing/README.md) is committed on purpose so every release shares one signature
+!signing/folia-sideload.jks
 
 # External native build folder
 .externalNativeBuild

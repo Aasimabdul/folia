@@ -14,17 +14,21 @@ android {
         applicationId = "com.simbuild.folia"
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.3.2"
+        versionCode = 6
+        versionName = "0.3.3"
 
         // ABI selection is configured only in splits. Do not also set ndk.abiFilters,
         // because Android Gradle Plugin rejects using both filters together.
     }
 
-    // Android refuses to install an unsigned APK ("App not installed"), so release builds are always signed.
-    // With a real release key (FOLIA_KEYSTORE_* variables, set from GitHub secrets in CI) the APK is signed
-    // with it. Without one, it falls back to the debug key so the APK still installs.
+    // Android refuses unsigned APKs ("App not installed"), and it also refuses to update an app when the new
+    // APK is signed with a different key. So every release must use the SAME key:
+    //   1. a private release key from FOLIA_KEYSTORE_* variables (GitHub secrets), if the maintainer sets one, else
+    //   2. the public sideload key committed in signing/ (see signing/README.md), else
+    //   3. the local debug key (only if the signing folder was removed).
+    // Switching between these changes the signature, and Android then needs a one-time uninstall.
     val releaseKeystorePath: String? = System.getenv("FOLIA_KEYSTORE_PATH")
+    val sideloadKeystore = rootProject.file("signing/folia-sideload.jks")
     signingConfigs {
         if (releaseKeystorePath != null && file(releaseKeystorePath).exists()) {
             create("release") {
@@ -32,6 +36,14 @@ android {
                 storePassword = System.getenv("FOLIA_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("FOLIA_KEY_ALIAS")
                 keyPassword = System.getenv("FOLIA_KEY_PASSWORD")
+            }
+        } else if (sideloadKeystore.exists()) {
+            create("release") {
+                storeFile = sideloadKeystore
+                storeType = "pkcs12"
+                storePassword = "folia-sideload"
+                keyAlias = "folia"
+                keyPassword = "folia-sideload"
             }
         }
     }

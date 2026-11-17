@@ -58,10 +58,22 @@ jobs:
         run: |
           SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           APKSIGNER="$(ls "$SDK"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          # Without a private key from secrets, the APKs must carry the committed sideload key's signature.
+          EXPECTED=""
+          if [ -z "${FOLIA_KEYSTORE_PATH:-}" ]; then
+            EXPECTED="$(keytool -list -v -keystore signing/folia-sideload.jks -storepass folia-sideload 2>/dev/null \
+              | grep 'SHA256:' | head -n 1 | sed 's/.*SHA256: *//' | tr -d ':' | tr 'A-F' 'a-f')"
+            echo "Expected sideload certificate SHA-256: $EXPECTED"
+          fi
           COUNT=0
           for apk in app/build/outputs/apk/release/*.apk; do
             echo "Verifying $apk"
-            "$APKSIGNER" verify --print-certs "$apk"
+            OUT="$("$APKSIGNER" verify --print-certs "$apk")"
+            echo "$OUT"
+            if [ -n "$EXPECTED" ]; then
+              echo "$OUT" | grep -q "certificate SHA-256 digest: $EXPECTED" \
+                || { echo "::error::$apk is not signed with the committed sideload key"; exit 1; }
+            fi
             COUNT=$((COUNT + 1))
           done
           test "$COUNT" -gt 0
@@ -93,13 +105,15 @@ jobs:
           ## Folia ${TAG}
 
           ### What's new
+          - All releases are now signed with one fixed key, so future versions install as normal updates.
+            **Uninstall the old Folia once before installing this version** (earlier builds used a different key).
           - Folia now appears in the file manager's "Open with" list for documents (Just once / Always),
             matching by file type and by file extension, and also in the share sheet.
           - Opening a file from a file manager reuses the running app instead of starting a second copy.
           - Theme switch in Settings: System default, Light or Dark (remembered).
           - New dark palette: deep ink-navy surfaces, soft blue accent, readable contrast; dialogs, menus
             and navigation follow it. Dark and sepia reading modes now recolor the pages themselves.
-          - Bumped Android version to ${VERSION} (version code 5).
+          - Bumped Android version to ${VERSION} (version code 6).
 
           ### Downloads
           Choose the APK matching your device architecture. Most modern Android phones use **arm64-v8a**.
