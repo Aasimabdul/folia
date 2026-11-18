@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.simbuild.folia.library.LibraryScreen
 import com.simbuild.folia.model.RecentDocument
 import com.simbuild.folia.ui.theme.AppThemeMode
 import com.simbuild.folia.ui.theme.PageStyle
@@ -147,217 +148,228 @@ fun HomeScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .statusBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // 1. Header: FOLIO tag, title & add button
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "FOLIO",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp,
-                            color = subtleColor
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "A quieter way to read.",
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "Everything you read, in one calm space.",
-                            fontSize = 13.sp,
-                            color = subtleColor
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(addBtnBg)
-                            .clickable { onOpenDocument() },
-                        contentAlignment = Alignment.Center
+        if (selectedBottomNav == 1) {
+            LibraryScreen(
+                recentDocuments = recentDocuments,
+                onOpenFile = onSelectRecent,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .statusBarsPadding()
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .statusBarsPadding(),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // 1. Header: FOLIO tag, title & add button
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Open Document",
-                            tint = primaryColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            // 2. Search bar
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(CircleShape)
-                        .background(pillBg)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = subtleColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (searchQuery.isEmpty()) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Search your documents",
-                                color = subtleColor,
-                                fontSize = 14.sp
+                                text = "FOLIO",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp,
+                                color = subtleColor
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "A quieter way to read.",
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "Everything you read, in one calm space.",
+                                fontSize = 13.sp,
+                                color = subtleColor
                             )
                         }
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            textStyle = TextStyle(
-                                color = MaterialTheme.colorScheme.onBackground,
-                                fontSize = 14.sp
-                            ),
-                            cursorBrush = SolidColor(primaryColor),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(
-                            onClick = { searchQuery = "" },
-                            modifier = Modifier.size(24.dp)
+
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(addBtnBg)
+                                .clickable { onOpenDocument() },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear search",
-                                tint = subtleColor,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Open Document",
+                                tint = primaryColor,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
-            }
 
-            // 3. Continue reading section
-            item {
-                Text(
-                    text = "Continue reading",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            item {
-                if (continueDoc != null) {
-                    ContinueReadingHeroCard(
-                        doc = continueDoc,
-                        cardBg = cardBg,
-                        primaryColor = primaryColor,
-                        subtleColor = subtleColor,
-                        onResume = { onSelectRecent(Uri.parse(continueDoc.uriString)) },
-                        onToggleFavorite = { onToggleFavorite(continueDoc.uriString) }
-                    )
-                } else {
-                    EmptyHeroCard(
-                        cardBg = cardBg,
-                        primaryColor = primaryColor,
-                        subtleColor = subtleColor,
-                        onOpen = onOpenDocument
-                    )
+                // 2. Search bar
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clip(CircleShape)
+                            .background(pillBg)
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = subtleColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Search your documents",
+                                    color = subtleColor,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                textStyle = TextStyle(
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontSize = 14.sp
+                                ),
+                                cursorBrush = SolidColor(primaryColor),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear search",
+                                    tint = subtleColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
                 }
-            }
 
-            // 4. "Your library" section header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // 3. Continue reading section
+                item {
                     Text(
-                        text = "Your library",
+                        text = "Continue reading",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Text(
-                        text = "View all",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = subtleColor,
-                        modifier = Modifier.clickable { selectedTab = "Recent" }
-                    )
                 }
-            }
 
-            // 5. Library tabs (Recent, Saved, Downloaded)
-            item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Recent", "Saved", "Downloaded").forEach { tab ->
-                        val isSelected = selectedTab == tab
-                        val tabBg = if (isSelected) primaryColor else pillBg
-                        val tabText = if (isSelected) colors.onPrimary else subtleColor
+                item {
+                    if (continueDoc != null) {
+                        ContinueReadingHeroCard(
+                            doc = continueDoc,
+                            cardBg = cardBg,
+                            primaryColor = primaryColor,
+                            subtleColor = subtleColor,
+                            onResume = { onSelectRecent(Uri.parse(continueDoc.uriString)) },
+                            onToggleFavorite = { onToggleFavorite(continueDoc.uriString) }
+                        )
+                    } else {
+                        EmptyHeroCard(
+                            cardBg = cardBg,
+                            primaryColor = primaryColor,
+                            subtleColor = subtleColor,
+                            onOpen = onOpenDocument
+                        )
+                    }
+                }
 
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(tabBg)
-                                .clickable { selectedTab = tab }
-                                .padding(horizontal = 16.dp, vertical = 7.dp)
-                        ) {
-                            Text(
-                                text = tab,
-                                color = tabText,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                            )
+                // 4. "Your library" section header
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Your library",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "View all",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = subtleColor,
+                            modifier = Modifier.clickable { selectedTab = "Recent" }
+                        )
+                    }
+                }
+
+                // 5. Library tabs (Recent, Saved, Downloaded)
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Recent", "Saved", "Downloaded").forEach { tab ->
+                            val isSelected = selectedTab == tab
+                            val tabBg = if (isSelected) primaryColor else pillBg
+                            val tabText = if (isSelected) colors.onPrimary else subtleColor
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(tabBg)
+                                    .clickable { selectedTab = tab }
+                                    .padding(horizontal = 16.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = tab,
+                                    color = tabText,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // 6. Document list items
-            if (filteredDocs.isEmpty()) {
-                item {
-                    Text(
-                        text = "No documents found in this section.",
-                        fontSize = 13.sp,
-                        color = subtleColor,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                }
-            } else {
-                items(filteredDocs, key = { it.uriString }) { doc ->
-                    LibraryDocumentRow(
-                        doc = doc,
-                        subtleColor = subtleColor,
-                        onClick = { onSelectRecent(Uri.parse(doc.uriString)) },
-                        onToggleFavorite = { onToggleFavorite(doc.uriString) },
-                        onRemove = { onRemoveRecent(doc.uriString) }
-                    )
+                // 6. Document list items
+                if (filteredDocs.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No documents found in this section.",
+                            fontSize = 13.sp,
+                            color = subtleColor,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+                } else {
+                    items(filteredDocs, key = { it.uriString }) { doc ->
+                        LibraryDocumentRow(
+                            doc = doc,
+                            subtleColor = subtleColor,
+                            onClick = { onSelectRecent(Uri.parse(doc.uriString)) },
+                            onToggleFavorite = { onToggleFavorite(doc.uriString) },
+                            onRemove = { onRemoveRecent(doc.uriString) }
+                        )
+                    }
                 }
             }
         }
