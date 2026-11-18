@@ -3,10 +3,12 @@ package com.simbuild.folia
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var incoming by mutableStateOf<IncomingFile?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         incoming = documentFrom(intent)
         setContent {
@@ -80,6 +83,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        // Private copies of opened documents are only needed while Folia is open
+        if (isFinishing) File(cacheDir, "open").deleteRecursively()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

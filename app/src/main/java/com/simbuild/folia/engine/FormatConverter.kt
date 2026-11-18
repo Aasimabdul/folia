@@ -6,7 +6,6 @@ import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * High-performance, offline document-to-HTML converter.
@@ -46,14 +45,16 @@ object FormatConverter {
 
         ZipFile(file).use { zip ->
             // 1. Map embedded media (images) to base64
+            SafeZip.checkEntryCount(zip)
+            val mediaBudget = MediaBudget()
             val imageMap = mutableMapOf<String, String>()
             val entries = zip.entries()
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
-                if (entry.name.startsWith("word/media/") && !entry.isDirectory) {
+                if (entry.name.startsWith("word/media/") && !entry.isDirectory && mediaBudget.tryTake(entry.size)) {
                     val ext = entry.name.substringAfterLast('.', "png").lowercase()
                     val mime = if (ext == "jpg" || ext == "jpeg") "image/jpeg" else "image/$ext"
-                    val bytes = zip.getInputStream(entry).use { it.readBytes() }
+                    val bytes = SafeZip.readBytes(zip, entry)
                     val b64 = encodeBase64(bytes)
                     imageMap[entry.name.substringAfterLast('/')] = "data:$mime;base64,$b64"
                 }
@@ -63,7 +64,7 @@ object FormatConverter {
             val relsMap = mutableMapOf<String, String>()
             val relsEntry = zip.getEntry("word/_rels/document.xml.rels")
             if (relsEntry != null) {
-                zip.getInputStream(relsEntry).use { input ->
+                SafeZip.open(zip, relsEntry).use { input ->
                     parseRels(input, relsMap)
                 }
             }
@@ -72,8 +73,8 @@ object FormatConverter {
             val docEntry = zip.getEntry("word/document.xml")
                 ?: return textToHtml("Could not locate document content inside Word file.")
 
-            zip.getInputStream(docEntry).use { input ->
-                val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            SafeZip.open(zip, docEntry).use { input ->
+                val dbf = SafeXml.factory()
                 val doc = dbf.newDocumentBuilder().parse(input)
                 doc.documentElement.normalize()
 
@@ -98,7 +99,7 @@ object FormatConverter {
 
     private fun parseRels(input: InputStream, relsMap: MutableMap<String, String>) {
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
             val relList = doc.getElementsByTagNameNS("*", "Relationship")
             for (i in 0 until relList.length) {
@@ -276,8 +277,8 @@ object FormatConverter {
             val contentEntry = zip.getEntry("content.xml")
                 ?: return textToHtml("Could not locate content.xml inside ODT document.")
 
-            zip.getInputStream(contentEntry).use { input ->
-                val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            SafeZip.open(zip, contentEntry).use { input ->
+                val dbf = SafeXml.factory()
                 val doc = dbf.newDocumentBuilder().parse(input)
                 val paragraphs = doc.getElementsByTagNameNS("*", "p")
                 for (i in 0 until paragraphs.length) {

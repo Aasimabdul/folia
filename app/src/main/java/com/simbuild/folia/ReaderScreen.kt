@@ -1,5 +1,13 @@
 package com.simbuild.folia
 
+import android.os.Build
+import android.view.ViewTreeObserver
+import android.view.WindowManager
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.simbuild.folia.ui.theme.findActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -44,14 +52,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -101,7 +108,7 @@ import kotlinx.coroutines.withContext
  * - Find-in-document search with match navigation
  * - Table of Contents (TOC / Outlines) chapter navigation
  * - Page styles: original colours (default), dark pages, sepia; set in Settings or with the top-bar button
- * - Bottom bar with page thumbnails, page slider and a page counter that stays visible in immersive mode
+ * - Bottom bar with page thumbnails (tap to jump), previous/next buttons and a page counter that stays visible in immersive mode
  * - Reflow text scaling (A- / A+) for EPUB/Word/Markdown/Code/Office
  * - Double-tap / gesture zoom & pan
  * - Detailed format capability and security audit dialog
@@ -120,6 +127,7 @@ fun ReaderScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var isControlsVisible by remember { mutableStateOf(true) }
+    ImmersiveSystemBars()
     // Page colours come from the saved page style (default: original colours, also in dark mode).
     val appIsDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val readingTheme = pageStyle.resolve(appIsDark)
@@ -460,20 +468,6 @@ fun ReaderScreen(
                                 coroutineScope.launch { listState.scrollToItem(page.coerceIn(0, pageCount - 1)) }
                             }
                         )
-                        Slider(
-                            value = currentPage.toFloat(),
-                            onValueChange = { targetPage ->
-                                coroutineScope.launch {
-                                    listState.scrollToItem(targetPage.toInt().coerceIn(0, pageCount - 1))
-                                }
-                            },
-                            valueRange = 0f..(pageCount - 1).toFloat(),
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -787,4 +781,49 @@ private fun channelMap(ink: IntArray, paper: IntArray): ColorFilter {
             )
         )
     )
+}
+
+/**
+ * True full-screen reading: hides the status and navigation bars while the reader is on screen.
+ * Swiping from an edge shows them briefly (transient) and they hide again by themselves.
+ * The previous state is restored when the reader leaves the screen, and the effect is re-applied after
+ * rotation or when the window regains focus. Content may extend under the display cutout in landscape.
+ */
+@Composable
+private fun ImmersiveSystemBars() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = view.context.findActivity()?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowCompat.getInsetsController(window, view)
+            val previousBehavior = controller.systemBarsBehavior
+            val previousCutout = if (Build.VERSION.SDK_INT >= 28) window.attributes.layoutInDisplayCutoutMode else 0
+
+            fun hideBars() {
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            }
+
+            if (Build.VERSION.SDK_INT >= 28) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            hideBars()
+            // Some devices bring the bars back when the window loses and regains focus (dialogs, split screen)
+            val focusListener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus -> if (hasFocus) hideBars() }
+            view.viewTreeObserver.addOnWindowFocusChangeListener(focusListener)
+
+            onDispose {
+                view.viewTreeObserver.removeOnWindowFocusChangeListener(focusListener)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = previousBehavior
+                if (Build.VERSION.SDK_INT >= 28) {
+                    window.attributes = window.attributes.apply { layoutInDisplayCutoutMode = previousCutout }
+                }
+            }
+        }
+    }
 }

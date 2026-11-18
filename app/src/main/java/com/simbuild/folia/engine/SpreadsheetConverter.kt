@@ -5,7 +5,6 @@ import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Robust offline converter for spreadsheets:
@@ -42,7 +41,7 @@ object SpreadsheetConverter {
                 val sharedStrings = mutableListOf<String>()
                 val sstEntry = zip.getEntry("xl/sharedStrings.xml")
                 if (sstEntry != null) {
-                    zip.getInputStream(sstEntry).use { input ->
+                    SafeZip.open(zip, sstEntry).use { input ->
                         parseSharedStrings(input, sharedStrings)
                     }
                 }
@@ -51,7 +50,7 @@ object SpreadsheetConverter {
                 val sheets = mutableListOf<Pair<String, String>>() // (sheetName, rId)
                 val wbEntry = zip.getEntry("xl/workbook.xml")
                 if (wbEntry != null) {
-                    zip.getInputStream(wbEntry).use { input ->
+                    SafeZip.open(zip, wbEntry).use { input ->
                         parseWorkbookSheets(input, sheets)
                     }
                 }
@@ -72,7 +71,7 @@ object SpreadsheetConverter {
                     if (sheetEntry != null) {
                         sb.append("<div class=\"sheet-card\">\n")
                         sb.append("<h2 class=\"sheet-title\">📊 ").append(escapeHtml(sheetName)).append("</h2>\n")
-                        zip.getInputStream(sheetEntry).use { input ->
+                        SafeZip.open(zip, sheetEntry).use { input ->
                             renderWorksheetTable(input, sharedStrings, sb)
                         }
                         sb.append("</div>\n")
@@ -93,7 +92,7 @@ object SpreadsheetConverter {
 
     private fun parseSharedStrings(input: InputStream, list: MutableList<String>) {
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
             val siNodes = doc.getElementsByTagNameNS("*", "si")
             for (i in 0 until siNodes.length) {
@@ -112,7 +111,7 @@ object SpreadsheetConverter {
 
     private fun parseWorkbookSheets(input: InputStream, sheets: MutableList<Pair<String, String>>) {
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
             val sheetNodes = doc.getElementsByTagNameNS("*", "sheet")
             for (i in 0 until sheetNodes.length) {
@@ -132,7 +131,7 @@ object SpreadsheetConverter {
     ) {
         sb.append("<div class=\"table-scroll-wrap\"><table class=\"data-table\">\n")
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
             val rowNodes = doc.getElementsByTagNameNS("*", "row")
 
@@ -197,8 +196,8 @@ object SpreadsheetConverter {
                 val entry = zip.getEntry("content.xml")
                     ?: return delimitedToHtml(file, "csv")
 
-                zip.getInputStream(entry).use { input ->
-                    val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+                SafeZip.open(zip, entry).use { input ->
+                    val dbf = SafeXml.factory()
                     val doc = dbf.newDocumentBuilder().parse(input)
                     val tableNodes = doc.getElementsByTagNameNS("*", "table")
 

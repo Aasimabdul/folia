@@ -5,7 +5,6 @@ import org.w3c.dom.Node
 import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipFile
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * High-performance offline presentation converter:
@@ -42,14 +41,16 @@ object PresentationConverter {
         try {
             ZipFile(file).use { zip ->
                 // 1. Map media files to base64 data URIs
+                SafeZip.checkEntryCount(zip)
+                val mediaBudget = MediaBudget()
                 val mediaMap = mutableMapOf<String, String>()
                 val entries = zip.entries()
                 while (entries.hasMoreElements()) {
                     val entry = entries.nextElement()
-                    if (entry.name.startsWith("ppt/media/") && !entry.isDirectory) {
+                    if (entry.name.startsWith("ppt/media/") && !entry.isDirectory && mediaBudget.tryTake(entry.size)) {
                         val ext = entry.name.substringAfterLast('.', "png").lowercase()
                         val mime = if (ext == "jpg" || ext == "jpeg") "image/jpeg" else "image/$ext"
-                        val bytes = zip.getInputStream(entry).use { it.readBytes() }
+                        val bytes = SafeZip.readBytes(zip, entry)
                         val b64 = encodeBase64(bytes)
                         mediaMap[entry.name.substringAfterLast('/')] = "data:$mime;base64,$b64"
                     }
@@ -86,7 +87,7 @@ object PresentationConverter {
                     val relsMap = mutableMapOf<String, String>()
                     val relsEntry = zip.getEntry(relsPath)
                     if (relsEntry != null) {
-                        zip.getInputStream(relsEntry).use { input ->
+                        SafeZip.open(zip, relsEntry).use { input ->
                             parseRels(input, relsMap)
                         }
                     }
@@ -95,7 +96,7 @@ object PresentationConverter {
                     sb.append("<div class=\"slide-badge\">Slide ${idx + 1} of ${slideEntries.size}</div>\n")
                     sb.append("<div class=\"slide-body\">\n")
 
-                    zip.getInputStream(slideEntry).use { input ->
+                    SafeZip.open(zip, slideEntry).use { input ->
                         renderSlideContent(input, relsMap, mediaMap, sb)
                     }
 
@@ -115,7 +116,7 @@ object PresentationConverter {
 
     private fun parseRels(input: InputStream, map: MutableMap<String, String>) {
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
             val relNodes = doc.getElementsByTagNameNS("*", "Relationship")
             for (i in 0 until relNodes.length) {
@@ -136,7 +137,7 @@ object PresentationConverter {
         sb: StringBuilder
     ) {
         try {
-            val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            val dbf = SafeXml.factory()
             val doc = dbf.newDocumentBuilder().parse(input)
 
             // 1. Extract titles
@@ -230,8 +231,8 @@ object PresentationConverter {
         try {
             ZipFile(file).use { zip ->
                 val entry = zip.getEntry("content.xml") ?: return pptBinaryToHtml(file)
-                zip.getInputStream(entry).use { input ->
-                    val dbf = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+                SafeZip.open(zip, entry).use { input ->
+                    val dbf = SafeXml.factory()
                     val doc = dbf.newDocumentBuilder().parse(input)
                     val pages = doc.getElementsByTagNameNS("*", "page")
 

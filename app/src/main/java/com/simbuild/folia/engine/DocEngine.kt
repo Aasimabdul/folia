@@ -71,9 +71,20 @@ object DocEngines {
 
         // Stream SAF URI safely into a private temporary file
         val tempRaw = File(dir, "source_document")
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            tempRaw.outputStream().use { out -> input.copyTo(out, 64 * 1024) }
-        } ?: error("Cannot read document stream from provider: $uri")
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                // Size gate: refuse absurdly large files instead of filling the cache / running out of space
+                LimitedInputStream(input, SafeLimits.MAX_DOCUMENT_BYTES).use { limited ->
+                    tempRaw.outputStream().use { out -> limited.copyTo(out, 64 * 1024) }
+                }
+            } ?: error("Cannot read document stream from provider: $uri")
+        } catch (e: Throwable) {
+            tempRaw.delete()
+            if (e is DocumentTooLargeException) {
+                throw DocumentTooLargeException("This file is larger than ${SafeLimits.MAX_DOCUMENT_BYTES / (1024 * 1024)} MB and was not opened.")
+            }
+            throw e
+        }
 
         // 1. Identify format using magic bytes and container inspection
         val formatInfo = FormatRegistry.sniffFormat(tempRaw, uri, name)
