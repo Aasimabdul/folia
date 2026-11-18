@@ -37,7 +37,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.simbuild.folia.model.RecentDocument
 import com.simbuild.folia.ui.theme.AppThemeMode
+import com.simbuild.folia.ui.theme.PageStyle
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -91,6 +95,10 @@ fun HomeScreen(
     onRemoveRecent: (String) -> Unit,
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     onThemeModeChange: (AppThemeMode) -> Unit = {},
+    pageStyle: PageStyle = PageStyle.ORIGINAL,
+    onPageStyleChange: (PageStyle) -> Unit = {},
+    dimPagesInDarkMode: Boolean = true,
+    onDimPagesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Follow the theme that is actually applied (System / Light / Dark), not only the phone's setting
@@ -359,6 +367,10 @@ fun HomeScreen(
         SettingsDialog(
             themeMode = themeMode,
             onThemeModeChange = onThemeModeChange,
+            pageStyle = pageStyle,
+            onPageStyleChange = onPageStyleChange,
+            dimPagesInDarkMode = dimPagesInDarkMode,
+            onDimPagesChange = onDimPagesChange,
             onDismiss = { showSettingsDialog = false }
         )
     }
@@ -708,37 +720,59 @@ private fun FolioBottomNavBar(
 private fun SettingsDialog(
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit,
+    pageStyle: PageStyle,
+    onPageStyleChange: (PageStyle) -> Unit,
+    dimPagesInDarkMode: Boolean,
+    onDimPagesChange: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Settings", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Theme",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                SettingsSectionTitle("App theme")
                 AppThemeMode.entries.forEach { mode ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { onThemeModeChange(mode) }
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = themeMode == mode, onClick = { onThemeModeChange(mode) })
+                    SettingsRadioRow(
+                        selected = themeMode == mode,
+                        title = when (mode) {
+                            AppThemeMode.SYSTEM -> "System default"
+                            AppThemeMode.LIGHT -> "Light"
+                            AppThemeMode.DARK -> "Dark"
+                        },
+                        onClick = { onThemeModeChange(mode) }
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                SettingsSectionTitle("Document pages")
+                PageStyle.entries.forEach { style ->
+                    SettingsRadioRow(
+                        selected = pageStyle == style,
+                        title = style.label,
+                        subtitle = style.description,
+                        onClick = { onPageStyleChange(style) }
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Soften white pages in dark mode")
                         Text(
-                            text = when (mode) {
-                                AppThemeMode.SYSTEM -> "System default"
-                                AppThemeMode.LIGHT -> "Light"
-                                AppThemeMode.DARK -> "Dark"
-                            }
+                            text = "Slightly dims bright pages at night. Applies to original colours.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Switch(checked = dimPagesInDarkMode, onCheckedChange = onDimPagesChange)
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -758,4 +792,43 @@ private fun SettingsDialog(
             TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
+}
+
+@Composable
+private fun SettingsSectionTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary
+    )
+}
+
+@Composable
+private fun SettingsRadioRow(
+    selected: Boolean,
+    title: String,
+    onClick: () -> Unit,
+    subtitle: String? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Column {
+            Text(title)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }

@@ -107,6 +107,38 @@ enum class ReadingThemeMode {
     SEPIA
 }
 
+/**
+ * How document pages are colored in the reader (chosen in Settings, also cycled by the reader's top-bar button).
+ * Independent of [AppThemeMode]: a dark app can still show pages in their original colours.
+ */
+enum class PageStyle(val label: String, val description: String) {
+    ORIGINAL("Original colours", "Pages look exactly like the document (recommended)"),
+    AUTO("Match app theme", "Dark pages when the app is dark, original when light"),
+    DARK("Always dark pages", "Dark paper with light text, for reading at night"),
+    SEPIA("Sepia", "Warm paper, gentle for long reading");
+
+    /** The look to draw for this style, given whether the app theme is currently dark. */
+    fun resolve(appIsDark: Boolean): ReadingThemeMode = when (this) {
+        ORIGINAL -> ReadingThemeMode.LIGHT
+        AUTO -> if (appIsDark) ReadingThemeMode.DARK else ReadingThemeMode.LIGHT
+        DARK -> ReadingThemeMode.DARK
+        SEPIA -> ReadingThemeMode.SEPIA
+    }
+
+    /** Next style for the reader's quick toggle button. */
+    fun next(): PageStyle = when (this) {
+        ORIGINAL -> DARK
+        DARK -> SEPIA
+        SEPIA -> ORIGINAL
+        AUTO -> ORIGINAL
+    }
+
+    companion object {
+        /** Parses a stored value; anything unknown or missing keeps pages in their original colours. */
+        fun fromName(name: String?): PageStyle = entries.firstOrNull { it.name == name } ?: ORIGINAL
+    }
+}
+
 /** App-wide appearance chosen by the user in Settings. */
 enum class AppThemeMode(val label: String) {
     SYSTEM("System"),

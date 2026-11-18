@@ -1,10 +1,13 @@
 package com.simbuild.folia
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,15 +15,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -79,6 +85,7 @@ import com.simbuild.folia.engine.SearchResult
 import com.simbuild.folia.engine.TocItem
 import com.simbuild.folia.ui.theme.DarkReadingBg
 import com.simbuild.folia.ui.theme.LightReadingBg
+import com.simbuild.folia.ui.theme.PageStyle
 import com.simbuild.folia.ui.theme.ReadingThemeMode
 import com.simbuild.folia.ui.theme.SepiaReadingBg
 import com.simbuild.folia.ui.theme.getFormatBadgeColor
@@ -93,7 +100,8 @@ import kotlinx.coroutines.withContext
  * - Smooth vertical scrolling with byte-budgeted LRU cache
  * - Find-in-document search with match navigation
  * - Table of Contents (TOC / Outlines) chapter navigation
- * - Reading themes (AMOLED Dark, Light Paper, Warm Sepia)
+ * - Page styles: original colours (default), dark pages, sepia; set in Settings or with the top-bar button
+ * - Bottom bar with page thumbnails, page slider and a page counter that stays visible in immersive mode
  * - Reflow text scaling (A- / A+) for EPUB/Word/Markdown/Code/Office
  * - Double-tap / gesture zoom & pan
  * - Detailed format capability and security audit dialog
@@ -105,13 +113,19 @@ fun ReaderScreen(
     initialPage: Int = 0,
     onBack: () -> Unit,
     onPageChanged: (page: Int, totalPages: Int) -> Unit = { _, _ -> },
+    pageStyle: PageStyle = PageStyle.ORIGINAL,
+    dimPagesInDarkMode: Boolean = true,
+    onPageStyleChange: (PageStyle) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
     var isControlsVisible by remember { mutableStateOf(true) }
-    // The reader starts in the look that matches the app theme (the toggle in the top bar still cycles all three)
+    // Page colours come from the saved page style (default: original colours, also in dark mode).
     val appIsDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    var readingTheme by remember { mutableStateOf(if (appIsDark) ReadingThemeMode.DARK else ReadingThemeMode.LIGHT) }
+    val readingTheme = pageStyle.resolve(appIsDark)
+    // Original (white) pages in a dark app get slightly dimmed so they are not blinding at night
+    val dimOriginalPages = dimPagesInDarkMode && appIsDark && readingTheme == ReadingThemeMode.LIGHT
+    val pageFilter = remember(readingTheme, dimOriginalPages) { pageColorFilter(readingTheme, dimOriginalPages) }
     var fontSizePt by remember { mutableFloatStateOf(14f) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
@@ -122,10 +136,12 @@ fun ReaderScreen(
     var searchResults by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var currentMatchIndex by remember { mutableIntStateOf(0) }
 
-    val bgColor = when (readingTheme) {
-        ReadingThemeMode.DARK -> DarkReadingBg
-        ReadingThemeMode.LIGHT -> LightReadingBg
-        ReadingThemeMode.SEPIA -> SepiaReadingBg
+    // The "desk" behind the pages: original pages sit on a dark desk when the app is dark
+    val bgColor = when {
+        readingTheme == ReadingThemeMode.DARK -> DarkReadingBg
+        readingTheme == ReadingThemeMode.SEPIA -> SepiaReadingBg
+        appIsDark -> DarkReadingBg
+        else -> LightReadingBg
     }
 
     BoxWithConstraints(
@@ -138,6 +154,8 @@ fun ReaderScreen(
         val heightPx = with(density) { maxHeight.roundToPx() }
 
         val cache = remember(engine) { PageCache() }
+        // Small separate budget (4 MB) for the thumbnail strip so it never competes with the page cache
+        val thumbCache = remember(engine) { PageCache(maxBytes = 4 shl 20) }
         var pageCount by remember(engine) { mutableIntStateOf(engine.pageCount) }
         var layoutVersion by remember(engine) { mutableIntStateOf(0) }
 
@@ -152,6 +170,7 @@ fun ReaderScreen(
                     )
                 }
                 cache.clear()
+                thumbCache.clear()
                 pageCount = engine.pageCount
                 layoutVersion++
             }
@@ -226,7 +245,7 @@ fun ReaderScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(count = pageCount, key = { "$layoutVersion-$it" }) { index ->
-                    PageItem(engine, cache, index, widthPx, readingTheme)
+                    PageItem(engine, cache, index, widthPx, pageFilter)
                 }
             }
         }
@@ -351,13 +370,7 @@ fun ReaderScreen(
                             }
 
                             // Theme toggle button
-                            IconButton(onClick = {
-                                readingTheme = when (readingTheme) {
-                                    ReadingThemeMode.DARK -> ReadingThemeMode.SEPIA
-                                    ReadingThemeMode.SEPIA -> ReadingThemeMode.LIGHT
-                                    ReadingThemeMode.LIGHT -> ReadingThemeMode.DARK
-                                }
-                            }) {
+                            IconButton(onClick = { onPageStyleChange(pageStyle.next()) }) {
                                 val iconColor = when (readingTheme) {
                                     ReadingThemeMode.DARK -> Color(0xFF90CAF9)
                                     ReadingThemeMode.SEPIA -> Color(0xFFD7CCC8)
@@ -397,7 +410,9 @@ fun ReaderScreen(
                 shadowElevation = 8.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -434,6 +449,17 @@ fun ReaderScreen(
                     }
 
                     if (pageCount > 1) {
+                        PageThumbnailStrip(
+                            engine = engine,
+                            cache = thumbCache,
+                            pageCount = pageCount,
+                            currentPage = currentPage,
+                            layoutVersion = layoutVersion,
+                            colorFilter = pageFilter,
+                            onSelect = { page ->
+                                coroutineScope.launch { listState.scrollToItem(page.coerceIn(0, pageCount - 1)) }
+                            }
+                        )
                         Slider(
                             value = currentPage.toFloat(),
                             onValueChange = { targetPage ->
@@ -452,6 +478,31 @@ fun ReaderScreen(
                 }
             }
         }
+
+        // Small page counter that stays visible while the bars are hidden
+        AnimatedVisibility(
+            visible = !isControlsVisible && pageCount > 0,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = "${currentPage + 1} / $pageCount",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                )
+            }
+        }
+
         if (showInfoDialog) {
             DocumentInfoDialog(
                 engine = engine,
@@ -477,7 +528,7 @@ fun ReaderScreen(
     }
 
     @Composable
-    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int, readingTheme: ReadingThemeMode) {
+    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int, colorFilter: ColorFilter?) {
         val density = LocalDensity.current
     
         val aspect = remember(engine, index) {
@@ -505,13 +556,110 @@ fun ReaderScreen(
                     bitmap = it.asImageBitmap(),
                     contentDescription = "Page ${index + 1}",
                     contentScale = ContentScale.FillWidth,
-                    colorFilter = pageColorFilter(readingTheme),
+                    colorFilter = colorFilter,
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
     }
     
+    /**
+     * Horizontal strip of small page previews above the slider. Only the few visible thumbnails are composed and
+     * rendered (about 140 px wide each), and they live in their own 4 MB cache, so RAM stays flat for any page count.
+     */
+    @Composable
+    private fun PageThumbnailStrip(
+        engine: DocEngine,
+        cache: PageCache,
+        pageCount: Int,
+        currentPage: Int,
+        layoutVersion: Int,
+        colorFilter: ColorFilter?,
+        onSelect: (Int) -> Unit
+    ) {
+        val stripState = rememberLazyListState()
+
+        // Keep the current page near the left of the strip as the reader scrolls or the slider moves
+        LaunchedEffect(currentPage, pageCount) {
+            stripState.scrollToItem((currentPage - 1).coerceIn(0, (pageCount - 1).coerceAtLeast(0)))
+        }
+
+        LazyRow(
+            state = stripState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(count = pageCount, key = { "$layoutVersion-thumb-$it" }) { index ->
+                PageThumbnail(
+                    engine = engine,
+                    cache = cache,
+                    index = index,
+                    selected = index == currentPage,
+                    colorFilter = colorFilter,
+                    onClick = { onSelect(index) }
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun PageThumbnail(
+        engine: DocEngine,
+        cache: PageCache,
+        index: Int,
+        selected: Boolean,
+        colorFilter: ColorFilter?,
+        onClick: () -> Unit
+    ) {
+        val bitmap by produceState(initialValue = cache.get(index), engine, index) {
+            if (value == null) {
+                value = withContext(Dispatchers.Default) {
+                    runCatching { engine.render(index, THUMBNAIL_WIDTH_PX) }.getOrNull()?.also { cache.put(index, it) }
+                }
+            }
+        }
+        val primary = MaterialTheme.colorScheme.primary
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .width(52.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onClick)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(52.dp)
+                    .height(72.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .border(
+                        width = if (selected) 2.dp else 0.5.dp,
+                        color = if (selected) primary else MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(4.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                bitmap?.let {
+                    Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "Page ${index + 1} preview",
+                        contentScale = ContentScale.Fit,
+                        colorFilter = colorFilter,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+            Text(
+                text = "${index + 1}",
+                fontSize = 10.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
     @Composable
     private fun TocDialog(
         tocItems: List<TocItem>,
@@ -607,19 +755,22 @@ private fun InfoItem(label: String, value: String) {
     }
 }
 
+private const val THUMBNAIL_WIDTH_PX = 140
+
 /**
- * Pages are rendered once as white-paper bitmaps and recolored at draw time, so switching the reading
- * theme is instant and costs no extra memory (the page cache is not rebuilt).
+ * Pages are rendered once as white-paper bitmaps and recolored at draw time, so switching the page style is
+ * instant and costs no extra memory (the page cache is not rebuilt).
  *
  * Each channel is mapped linearly: black -> `ink`, white -> `paper`.
- *  - DARK:  white paper becomes the app's ink-navy (#12161E) and black text becomes soft off-white (#E6E8EE),
- *           so pages look like the rest of the dark app instead of a bright white sheet.
+ *  - DARK:  white paper becomes the app's ink-navy (#12161E) and black text becomes soft off-white (#E6E8EE).
  *  - SEPIA: warm paper (#FBF0D9) with brown ink (#3E2D1D).
- *  - LIGHT: untouched.
- * Photos inside a page are recolored too, which is the usual trade-off of a night mode.
+ *  - LIGHT: the original colours. With [dimOriginal] (dark app only) white is softened to about 88 % so the
+ *           page is not blinding at night, while every colour keeps its hue.
+ * Photos inside a page are recolored too in DARK and SEPIA, which is the usual trade-off of a night mode.
  */
-private fun pageColorFilter(theme: ReadingThemeMode): ColorFilter? = when (theme) {
-    ReadingThemeMode.LIGHT -> null
+private fun pageColorFilter(theme: ReadingThemeMode, dimOriginal: Boolean): ColorFilter? = when (theme) {
+    ReadingThemeMode.LIGHT ->
+        if (dimOriginal) channelMap(ink = intArrayOf(0, 0, 0), paper = intArrayOf(224, 224, 224)) else null
     ReadingThemeMode.DARK -> channelMap(ink = intArrayOf(230, 232, 238), paper = intArrayOf(18, 22, 30))
     ReadingThemeMode.SEPIA -> channelMap(ink = intArrayOf(62, 45, 29), paper = intArrayOf(251, 240, 217))
 }

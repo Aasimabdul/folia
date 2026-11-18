@@ -35,6 +35,7 @@ import com.simbuild.folia.model.RecentDocument
 import com.simbuild.folia.ui.home.HomeScreen
 import com.simbuild.folia.ui.theme.AppThemeMode
 import com.simbuild.folia.ui.theme.FoliaTheme
+import com.simbuild.folia.ui.theme.PageStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +56,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings = remember { SettingsRepository(applicationContext) }
             var themeMode by remember { mutableStateOf(settings.themeMode) }
+            var pageStyle by remember { mutableStateOf(settings.pageStyle) }
+            var dimPages by remember { mutableStateOf(settings.dimPagesInDarkMode) }
 
             FoliaTheme(themeMode = themeMode) {
                 App(
@@ -63,6 +66,16 @@ class MainActivity : ComponentActivity() {
                     onThemeModeChange = { mode ->
                         themeMode = mode
                         settings.themeMode = mode
+                    },
+                    pageStyle = pageStyle,
+                    onPageStyleChange = { style ->
+                        pageStyle = style
+                        settings.pageStyle = style
+                    },
+                    dimPagesInDarkMode = dimPages,
+                    onDimPagesChange = { dim ->
+                        dimPages = dim
+                        settings.dimPagesInDarkMode = dim
                     }
                 )
             }
@@ -96,7 +109,11 @@ class MainActivity : ComponentActivity() {
 private fun App(
     incoming: IncomingFile?,
     themeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    pageStyle: PageStyle,
+    onPageStyleChange: (PageStyle) -> Unit,
+    dimPagesInDarkMode: Boolean,
+    onDimPagesChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -197,7 +214,10 @@ private fun App(
                 currentUri?.let { uri ->
                     repository.updateReadingProgress(uri.toString(), page, totalPages)
                 }
-            }
+            },
+            pageStyle = pageStyle,
+            dimPagesInDarkMode = dimPagesInDarkMode,
+            onPageStyleChange = onPageStyleChange
         )
     } else {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -218,7 +238,11 @@ private fun App(
                     recentDocs = repository.getRecentDocuments()
                 },
                 themeMode = themeMode,
-                onThemeModeChange = onThemeModeChange
+                onThemeModeChange = onThemeModeChange,
+                pageStyle = pageStyle,
+                onPageStyleChange = onPageStyleChange,
+                dimPagesInDarkMode = dimPagesInDarkMode,
+                onDimPagesChange = onDimPagesChange
             )
 
             if (isLoading) {
