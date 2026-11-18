@@ -1,5 +1,23 @@
 package com.simbuild.folia
 
+import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.platform.LocalContext
+import com.simbuild.folia.annotations.AnnotateTool
+import com.simbuild.folia.annotations.AnnotationExporter
+import com.simbuild.folia.annotations.AnnotationStorage
+import com.simbuild.folia.annotations.AnnotationStore
+import com.simbuild.folia.annotations.AnnotationToolbar
+import com.simbuild.folia.annotations.ExportResult
+import com.simbuild.folia.annotations.ExportState
+import com.simbuild.folia.annotations.InkSettings
+import com.simbuild.folia.annotations.PageInkLayer
+import kotlinx.coroutines.delay
 import android.os.Build
 import android.view.ViewTreeObserver
 import android.view.WindowManager
@@ -123,9 +141,14 @@ fun ReaderScreen(
     pageStyle: PageStyle = PageStyle.ORIGINAL,
     dimPagesInDarkMode: Boolean = true,
     onPageStyleChange: (PageStyle) -> Unit = {},
+    documentKey: String? = null,
+    canEdit: Boolean = false,
+    onEdit: () -> Unit = {},
+    onOpenUri: (Uri) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var isControlsVisible by remember { mutableStateOf(true) }
     ImmersiveSystemBars()
     // Page colours come from the saved page style (default: original colours, also in dark mode).
@@ -137,6 +160,88 @@ fun ReaderScreen(
     var fontSizePt by remember { mutableFloatStateOf(14f) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTocDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    var infoMessage by remember { mutableStateOf<String?>(null) }
+
+    // Sketch / annotate: strokes live in their own store, saved beside the app data, never inside the document
+    val canAnnotate = !engine.isReflowable
+    var annotateMode by remember { mutableStateOf(false) }
+    var ink by remember { mutableStateOf(InkSettings()) }
+    val store = remember(engine) { AnnotationStore() }
+    var inkVersion by remember(engine) { mutableIntStateOf(0) }
+    var inkLoaded by remember(engine) { mutableStateOf(false) }
+    var exportState by remember { mutableStateOf<ExportState?>(null) }
+
+    DisposableEffect(store, documentKey) {
+        store.onChange = { inkVersion++ }
+        onDispose {
+            store.onChange = {}
+            // Flush the latest strokes when the reader closes
+            if (documentKey != null && canAnnotate && inkLoaded) AnnotationStorage.save(context, documentKey, store)
+        }
+    }
+    LaunchedEffect(store, documentKey) {
+        if (documentKey != null && canAnnotate) {
+            withContext(Dispatchers.IO) { AnnotationStorage.load(context, documentKey, store) }
+        }
+        inkLoaded = true
+    }
+    LaunchedEffect(inkVersion) {
+        if (documentKey != null && canAnnotate && inkLoaded) {
+            delay(700) // debounce: wait for a pause in drawing
+            withContext(Dispatchers.IO) { AnnotationStorage.save(context, documentKey, store) }
+        }
+    }
+
+    val saveCopyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
+        if (target != null) {
+            val pages = AnnotationExporter.pagesToExport(engine, store)
+            exportState = ExportState.Running(0, pages.size)
+            coroutineScope.launch {
+                val outcome = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val stream = context.contentResolver.openOutputStream(target, "wt")
+                            ?: error("The chosen location cannot be written to.")
+                        stream.use { out ->
+                            AnnotationExporter.writePdf(engine, store, pages, out) { done, total ->
+                                exportState = ExportState.Running(done, total)
+                            }
+                        }
+                        val verified = AnnotationExporter.verify(context, target, pages.size)
+                        ExportResult(
+                            uri = target,
+                            fileName = AnnotationExporter.displayName(context.contentResolver, target),
+                            location = AnnotationExporter.describeLocation(target),
+                            pagesWritten = pages.size,
+                            verified = verified,
+                            note = if (pages.size < engine.pageCount) "Only the ${pages.size} annotated pages were saved (the document has ${engine.pageCount} pages)." else null
+                        )
+                    }
+                }
+                exportState = outcome.fold(
+                    onSuccess = { ExportState.Done(it) },
+                    onFailure = { e ->
+                        // Do not leave an empty or half-written file behind
+                        runCatching { DocumentsContract.deleteDocument(context.contentResolver, target) }
+                        val msg = e.message.orEmpty()
+                        ExportState.Failed(
+                            if (msg.contains("ENOSPC", true) || msg.contains("space", true)) "Not enough free storage to save the copy."
+                            else "The copy could not be saved: " + msg.ifBlank { "unknown error" }
+                        )
+                    }
+                )
+            }
+        }
+    }
+    val startSaveCopy = {
+        if (store.isEmpty) {
+            infoMessage = "Nothing is drawn yet, so there is nothing to save."
+        } else {
+            val base = engine.title.substringBeforeLast('.', engine.title).ifBlank { "document" }
+            saveCopyLauncher.launch("$base (annotated).pdf")
+        }
+    }
 
     // Search state
     var isSearchActive by remember { mutableStateOf(false) }
@@ -253,7 +358,7 @@ fun ReaderScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(count = pageCount, key = { "$layoutVersion-$it" }) { index ->
-                    PageItem(engine, cache, index, widthPx, pageFilter)
+                    PageItem(engine, cache, index, widthPx, pageFilter, if (canAnnotate) store else null, inkVersion, if (annotateMode) ink else InkSettings(tool = AnnotateTool.MOVE))
                 }
             }
         }
@@ -392,9 +497,46 @@ fun ReaderScreen(
                                 )
                             }
 
-                            // Document details dialog
-                            IconButton(onClick = { showInfoDialog = true }) {
-                                Icon(imageVector = Icons.Default.Info, contentDescription = "Document Info")
+                            // More actions
+                            Box {
+                                IconButton(onClick = { showMoreMenu = true }) {
+                                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More actions")
+                                }
+                                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (annotateMode) "Stop sketching" else "Sketch / Annotate") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            if (canAnnotate) {
+                                                annotateMode = !annotateMode
+                                                if (annotateMode) { scale = 1f; offsetX = 0f; offsetY = 0f }
+                                            } else {
+                                                infoMessage = "Sketching works on PDFs and images. Text documents (EPUB, Word, Markdown...) reflow when the screen or text size changes, so strokes could not stay in place."
+                                            }
+                                        }
+                                    )
+                                    if (canEdit) {
+                                        DropdownMenuItem(
+                                            text = { Text("Edit text") },
+                                            onClick = { showMoreMenu = false; annotateMode = false; onEdit() }
+                                        )
+                                    } else {
+                                        DropdownMenuItem(
+                                            text = { Text("Edit (not available for this format)") },
+                                            enabled = false,
+                                            onClick = { }
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Save annotated copy") },
+                                        enabled = canAnnotate,
+                                        onClick = { showMoreMenu = false; startSaveCopy() }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Document info") },
+                                        onClick = { showMoreMenu = false; showInfoDialog = true }
+                                    )
+                                }
                             }
                         }
                     },
@@ -407,7 +549,7 @@ fun ReaderScreen(
 
         // Bottom Page Control Scrubber Bar
         AnimatedVisibility(
-            visible = isControlsVisible,
+            visible = isControlsVisible && !annotateMode,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -473,9 +615,29 @@ fun ReaderScreen(
             }
         }
 
+        // Annotation toolbar (replaces the page bar while sketching)
+        AnimatedVisibility(
+            visible = annotateMode,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            AnnotationToolbar(
+                ink = ink,
+                onInkChange = { ink = it },
+                canUndo = store.canUndo,
+                canRedo = store.canRedo,
+                onUndo = { store.undo() },
+                onRedo = { store.redo() },
+                onClear = { if (!store.isEmpty) showClearConfirm = true },
+                onSaveCopy = startSaveCopy,
+                onDone = { annotateMode = false }
+            )
+        }
+
         // Small page counter that stays visible while the bars are hidden
         AnimatedVisibility(
-            visible = !isControlsVisible && pageCount > 0,
+            visible = !isControlsVisible && !annotateMode && pageCount > 0,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -495,6 +657,58 @@ fun ReaderScreen(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
+        }
+
+        if (showClearConfirm) {
+            AlertDialog(
+                onDismissRequest = { showClearConfirm = false },
+                title = { Text("Clear all sketches?") },
+                text = { Text("This removes every stroke from this document. You can still undo it right away.") },
+                confirmButton = { TextButton(onClick = { store.clearAll(); showClearConfirm = false }) { Text("Clear all") } },
+                dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") } }
+            )
+        }
+
+        infoMessage?.let { text ->
+            AlertDialog(
+                onDismissRequest = { infoMessage = null },
+                text = { Text(text) },
+                confirmButton = { TextButton(onClick = { infoMessage = null }) { Text("OK") } }
+            )
+        }
+
+        when (val state = exportState) {
+            null -> Unit
+            is ExportState.Running -> AlertDialog(
+                onDismissRequest = { },
+                title = { Text("Saving copy...") },
+                text = { Text("Page ${state.done} of ${state.total}") },
+                confirmButton = { }
+            )
+            is ExportState.Failed -> AlertDialog(
+                onDismissRequest = { exportState = null },
+                title = { Text("Could not save") },
+                text = { Text(state.message) },
+                confirmButton = { TextButton(onClick = { exportState = null }) { Text("OK") } }
+            )
+            is ExportState.Done -> AlertDialog(
+                onDismissRequest = { exportState = null },
+                title = { Text("Copy saved") },
+                text = {
+                    Column {
+                        Text(state.result.fileName, fontWeight = FontWeight.SemiBold)
+                        Text("Saved in: ${state.result.location}")
+                        Text("${state.result.pagesWritten} page(s), pages are pictures in this copy (text is not selectable).", fontSize = 12.sp)
+                        if (state.result.note != null) Text(state.result.note, fontSize = 12.sp)
+                        Text(
+                            if (state.result.verified) "Checked: the saved file opens correctly." else "Could not re-open the file to check it.",
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                confirmButton = { TextButton(onClick = { val u = state.result.uri; exportState = null; onOpenUri(u) }) { Text("Open copy") } },
+                dismissButton = { TextButton(onClick = { exportState = null }) { Text("Close") } }
+            )
         }
 
         if (showInfoDialog) {
@@ -522,7 +736,16 @@ fun ReaderScreen(
     }
 
     @Composable
-    private fun PageItem(engine: DocEngine, cache: PageCache, index: Int, widthPx: Int, colorFilter: ColorFilter?) {
+    private fun PageItem(
+        engine: DocEngine,
+        cache: PageCache,
+        index: Int,
+        widthPx: Int,
+        colorFilter: ColorFilter?,
+        store: AnnotationStore?,
+        inkVersion: Int,
+        ink: InkSettings
+    ) {
         val density = LocalDensity.current
     
         val aspect = remember(engine, index) {
@@ -541,7 +764,7 @@ fun ReaderScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(heightDp)
+                .height(heightDp + 8.dp)
                 .padding(vertical = 4.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -551,6 +774,17 @@ fun ReaderScreen(
                     contentDescription = "Page ${index + 1}",
                     contentScale = ContentScale.FillWidth,
                     colorFilter = colorFilter,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            // Sketch layer: exactly the same bounds as the page picture, so strokes stay aligned at any zoom
+            if (store != null && bitmap != null) {
+                PageInkLayer(
+                    pageIndex = index,
+                    store = store,
+                    version = inkVersion,
+                    ink = ink,
+                    aspect = aspect,
                     modifier = Modifier.fillMaxSize()
                 )
             }

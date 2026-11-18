@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.IntentCompat
 import com.simbuild.folia.data.RecentDocumentsRepository
 import com.simbuild.folia.data.SettingsRepository
+import com.simbuild.folia.editor.EditorLogic
+import com.simbuild.folia.editor.TextEditorScreen
 import com.simbuild.folia.engine.DocEngine
 import com.simbuild.folia.engine.DocEngines
 import com.simbuild.folia.model.RecentDocument
@@ -136,6 +138,8 @@ private fun App(
     var initialPage by remember { mutableIntStateOf(0) }
     // Bumped whenever a document is (re)opened so the same file can be opened again
     var reloadToken by remember { mutableIntStateOf(0) }
+    // True while the plain-text editor is open on the current document
+    var editing by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -202,7 +206,22 @@ private fun App(
     }
 
     val currentEngine = engine
-    if (currentEngine != null && currentUri != null) {
+    val editUri = currentUri
+    if (editing && currentEngine != null && editUri != null) {
+        TextEditorScreen(
+            uri = editUri,
+            fileName = currentEngine.title,
+            onClose = { openUri ->
+                editing = false
+                // Re-open so the reader shows the saved text (or the new copy)
+                if (openUri != null) {
+                    currentUri = openUri
+                    initialPage = 0
+                }
+                reloadToken++
+            }
+        )
+    } else if (currentEngine != null && currentUri != null) {
         BackHandler {
             engine?.close()
             engine = null
@@ -226,7 +245,15 @@ private fun App(
             },
             pageStyle = pageStyle,
             dimPagesInDarkMode = dimPagesInDarkMode,
-            onPageStyleChange = onPageStyleChange
+            onPageStyleChange = onPageStyleChange,
+            documentKey = currentUri?.toString(),
+            canEdit = EditorLogic.isEditable(currentEngine.title),
+            onEdit = { editing = true },
+            onOpenUri = { uri ->
+                initialPage = 0
+                currentUri = uri
+                reloadToken++
+            }
         )
     } else {
         Box(modifier = Modifier.fillMaxSize()) {
