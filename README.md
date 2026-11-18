@@ -29,7 +29,7 @@ Folia adheres to strict capability reporting: every format has an explicit statu
 | **H. Archives** | `.zip`, `.tar`, `.gz`, `.7z`, `.rar` | Safe archive browser; Zip-slip and Zip-bomb protected; tap files to open |
 | **I. Technical & Notes** | `.eml`, `.msg`, `.ics`, `.vcf`, `.odg`, `.dxf`, `.pub`, `.vsd`, `.one` | Email, calendar, and vCard summaries; honest compatibility disclosure for CAD/DTP |
 
-> 📌 **Complete Matrix:** See [`FORMATS.md`](file:///home/abdulaasim/Downloads/docreader/FORMATS.md) for the exhaustive table of all 100+ extensions, MIME types, and technical notes.
+> 📌 **Complete Matrix:** See [`FORMATS.md`](FORMATS.md) for the exhaustive table of all 100+ extensions, MIME types, and technical notes.
 
 ---
 
@@ -39,18 +39,23 @@ Folia adheres to strict capability reporting: every format has an explicit statu
 - **🔒 Active Content Protection**: Macros, scripts, and embedded active content are strictly blocked.
 - **🔍 Find in Document**: In-document text search with match counts and next/previous match navigation.
 - **📑 Table of Contents (TOC)**: Outline drawer to jump instantly between chapters and sections.
-- **🎨 Reading Themes**:
-  - **Dark**: `#1E1E1E` background, comfortable eye-friendly dark surface.
-  - **Light Paper**: `#FFFFFF` crisp reading surface.
-  - **Warm Sepia**: `#FBF0D9` amber tone designed to reduce eye strain.
+- **🎨 Page styles** (Settings, or the colour dot in the reader): **Original colours** (default, even when the app is dark, with an optional
+  softening of bright white), **Match app theme**, **Always dark pages**, and **Sepia**. The app itself can be Light, Dark or System.
+- **🖼️ Full-screen reading**: system bars are hidden while you read; swipe from an edge to show them briefly.
+- **🧭 Page thumbnails** along the bottom of the reader, tap to jump; previous/next buttons and a page counter.
+- **✍️ Sketch / Annotate** (PDF and images): pen, highlighter, eraser, colours, thickness, undo/redo, stylus-only mode. Sketches autosave beside the app
+  data (the original file is never modified) and can be exported with **Save annotated copy** as a new PDF.
+- **📝 Text editor** for TXT, Markdown, code and other plain-text files: undo/redo, unsaved-changes guard, overwrite confirmation, Save as, and
+  read-back verification. Other formats (DOCX, PDF, EPUB ...) are read-only; Folia says so instead of pretending.
 - **🔤 Reflow & Text Resizing**: Increase or decrease font size (`A-` / `A+`) on reflowable documents (Word, EPUB, MOBI, Markdown, Text).
 - **🔎 Zoom & Pan**: Pinch-to-zoom or double-tap to inspect small text, diagrams, and high-res comic art.
 - **⚡ Ultra-low RAM Footprint**:
   - **Byte-budgeted LRU cache (`PageCache`)**: Limits bitmap memory to 8–32 MB max regardless of whether a document has 10 or 3,000 pages.
   - **Per-ABI APK splits**: Ships only native binaries for your phone's architecture (`arm64-v8a` / `armeabi-v7a`).
 - **📚 Library & Recents**:
-  - Automatically records recently opened files, reading progress (Page X of Y), and timestamps.
-  - Filter by category: *All*, *PDF & Fixed*, *Word & Docs*, *eBooks & Comics*, *Spreadsheets*, *Presentations*, *Text & Code*, *Images*, *Archives*.
+  - **File manager**: add folders with Android's folder picker (scoped storage, no broad permissions), browse nested folders with a breadcrumb,
+    search, sort by name/date/size/type, list or grid, and rename, share or delete.
+  - Home keeps recently opened files with reading progress (Page X of Y) and favourites.
 
 ---
 
@@ -59,7 +64,10 @@ Folia adheres to strict capability reporting: every format has an explicit statu
 ```
 app/src/main/java/com/simbuild/folia/
 ├── MainActivity.kt                  # Navigation router & SAF OpenDocument intent handler
-├── ReaderScreen.kt                  # Reader UI (search, TOC, scrubber, zoom, themes)
+├── ReaderScreen.kt                  # Reader UI (search, TOC, thumbnails, zoom, page styles, immersive mode)
+├── annotations/                     # Sketch model (undo/redo), ink layer UI, autosave, PDF copy export
+├── editor/                          # Plain-text editor and its logic
+├── library/                         # SAF file manager (browser, sorting/search logic, screen)
 ├── model/
 │   └── RecentDocument.kt            # Document metadata & reading progress model
 ├── data/
@@ -75,6 +83,7 @@ app/src/main/java/com/simbuild/folia/
 │   ├── ArchiveConverter.kt          # Safe archive browser (Zip-slip & Zip-bomb safe)
 │   ├── ImageDocEngine.kt            # Memory-safe image decoder & sanitized SVG
 │   ├── UnsupportedDocEngine.kt      # Honest compatibility informer for proprietary DTP/CAD
+│   ├── SafeIo.kt                    # Size limits, zip-bomb guard, hardened XML parser
 │   └── PageCache.kt                 # Byte-budgeted LRU Bitmap cache
 └── ui/
     ├── home/
@@ -121,6 +130,14 @@ To execute the test suite:
    ```
 3. Release APKs with per-ABI optimization will be generated at:
    `app/build/outputs/apk/release/`
+
+---
+
+## 🔐 Security & Privacy
+
+See [`SECURITY.md`](SECURITY.md) (how files are parsed safely, how to report a vulnerability, signing key notes) and
+[`PRIVACY.md`](PRIVACY.md). Verify downloads with `SHA256SUMS.txt` from the release.
+Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) · Changes: [`CHANGELOG.md`](CHANGELOG.md) · Third-party licenses: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ---
 

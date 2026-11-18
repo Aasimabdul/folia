@@ -14,8 +14,8 @@ android {
         applicationId = "com.simbuild.folia"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.3.3"
+        versionCode = 7
+        versionName = "1.0.0"
 
         // ABI selection is configured only in splits. Do not also set ndk.abiFilters,
         // because Android Gradle Plugin rejects using both filters together.

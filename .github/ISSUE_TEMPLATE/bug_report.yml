@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Please do not attach private documents. For security problems use the Security tab instead."
+  - type: input
+    id: version
+    attributes:
+      label: Folia version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: "Samsung A16, Android 15"
+    validations:
+      required: true
+  - type: input
+    id: format
+    attributes:
+      label: File type
+      placeholder: "PDF, DOCX, EPUB ..."
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true

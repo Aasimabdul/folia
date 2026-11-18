@@ -98,27 +98,23 @@ jobs:
             echo "Release ${TAG} already exists; leaving the published release untouched."
             exit 0
           fi
-          gh release create "${TAG}" app/build/outputs/apk/release/*.apk \
-            --title "Folia ${TAG} — Minimalist Reading Experience" \
+
+          # Checksums so downloads can be verified (sha256sum -c SHA256SUMS.txt)
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/*.apk release-assets/
+          (cd release-assets && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+          # Release notes come from docs/release-notes/<tag>.md (kept in the repository and reviewed like code)
+          NOTES_FILE="docs/release-notes/${TAG}.md"
+          if [ ! -f "${NOTES_FILE}" ]; then
+            NOTES_FILE="$RUNNER_TEMP/notes.md"
+            printf '## Folia %s\n\nSee CHANGELOG.md for details.\n' "${TAG}" > "${NOTES_FILE}"
+          fi
+
+          PRERELEASE=""
+          case "${VERSION}" in *-*) PRERELEASE="--prerelease";; esac
+
+          gh release create "${TAG}" release-assets/*.apk release-assets/SHA256SUMS.txt \
+            --title "Folia ${TAG}" \
             --target "${GITHUB_SHA}" \
-            --notes-file <(cat <<NOTES
-          ## Folia ${TAG}
-
-          ### What's new
-          - All releases are now signed with one fixed key, so future versions install as normal updates.
-            **Uninstall the old Folia once before installing this version** (earlier builds used a different key).
-          - Folia now appears in the file manager's "Open with" list for documents (Just once / Always),
-            matching by file type and by file extension, and also in the share sheet.
-          - Opening a file from a file manager reuses the running app instead of starting a second copy.
-          - Theme switch in Settings: System default, Light or Dark (remembered).
-          - New dark palette: deep ink-navy surfaces, soft blue accent, readable contrast; dialogs, menus
-            and navigation follow it. Dark and sepia reading modes now recolor the pages themselves.
-          - Bumped Android version to ${VERSION} (version code 6).
-
-          ### Downloads
-          Choose the APK matching your device architecture. Most modern Android phones use **arm64-v8a**.
-
-          ### Build verification
-          Unit tests and Android debug/release builds must pass in this workflow before this release is published.
-          NOTES
-          )
+            --notes-file "${NOTES_FILE}" ${PRERELEASE}
